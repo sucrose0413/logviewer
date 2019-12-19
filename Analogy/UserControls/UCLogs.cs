@@ -61,7 +61,6 @@ namespace Analogy
         private ReaderWriterLockSlim lockSlim;
         private DataTable _messageData;
         private DataTable _bookmarkedMessages;
-        private char[] DataSourceSplitter = { ' ', '(', ')' };
         private IProgress<AnalogyProgressReport> ProgressReporter { get; set; }
         private readonly List<XtraFormLogGrid> _externalWindows = new List<XtraFormLogGrid>();
         private List<XtraFormLogGrid> ExternalWindows
@@ -108,6 +107,11 @@ namespace Analogy
         private int TotalPages => PagingManager.TotalPages;
         private IAnalogyOfflineDataProvider FileDataProvider { get; set; }
         private IAnalogyOfflineDataProvider AnalogyOfflineDataProvider { get; } = new AnalogyOfflineDataProvider();
+        public GridView LogGrid
+        {
+            get => logGrid;
+            set => logGrid = value;
+        }
         public UCLogs()
         {
             InitializeComponent();
@@ -150,14 +154,14 @@ namespace Analogy
                     progressBar1.Visible = false;
             });
 
-            logGrid.RowCountChanged += (s, arg) =>
+            LogGrid.RowCountChanged += (s, arg) =>
             {
                 if (Settings.AutoScrollToLastMessage && !IsDisposed)
                 {
                     BeginInvoke(new MethodInvoker(() =>
                     {
-                        logGrid.MoveLast();
-                        logGrid.MakeRowVisible(logGrid.FocusedRowHandle);
+                        LogGrid.MoveLast();
+                        LogGrid.MakeRowVisible(LogGrid.FocusedRowHandle);
                     }));
 
                 }
@@ -189,7 +193,7 @@ namespace Analogy
             KeyEventArgs e = new KeyEventArgs(keyData);
             if (e.Control && e.KeyCode == Keys.F)
             {
-                txtbIncludeText.Focus();
+                txtbInclude.Focus();
             }
             if (e.Shift && e.KeyCode == Keys.F)
 
@@ -199,13 +203,13 @@ namespace Analogy
 
             if (e.Alt && e.KeyCode == Keys.E)
             {
-                chkLstLogLevel.Items[0].CheckState = (chkLstLogLevel.Items[0].CheckState == CheckState.Checked)
+                chkLstLogLevel.Items[1].CheckState = (chkLstLogLevel.Items[1].CheckState == CheckState.Checked)
                     ? CheckState.Unchecked
                     : CheckState.Checked;
             }
             if (e.Alt && e.KeyCode == Keys.W)
             {
-                chkLstLogLevel.Items[1].CheckState = (chkLstLogLevel.Items[1].CheckState == CheckState.Checked)
+                chkLstLogLevel.Items[2].CheckState = (chkLstLogLevel.Items[2].CheckState == CheckState.Checked)
                     ? CheckState.Unchecked
                     : CheckState.Checked;
             }
@@ -217,7 +221,7 @@ namespace Analogy
             if (e.Control && e.KeyCode == Keys.F)
 
             {
-                txtbIncludeText.Focus();
+                txtbInclude.Focus();
                 return true;
             }
             if (e.Shift && e.KeyCode == Keys.F)
@@ -229,14 +233,14 @@ namespace Analogy
 
             if (e.Alt && e.KeyCode == Keys.E)
             {
-                chkLstLogLevel.Items[0].CheckState = (chkLstLogLevel.Items[0].CheckState == CheckState.Checked)
+                chkLstLogLevel.Items[1].CheckState = (chkLstLogLevel.Items[1].CheckState == CheckState.Checked)
                     ? CheckState.Unchecked
                     : CheckState.Checked;
                 return true;
             }
             if (e.Alt && e.KeyCode == Keys.W)
             {
-                chkLstLogLevel.Items[1].CheckState = (chkLstLogLevel.Items[1].CheckState == CheckState.Checked)
+                chkLstLogLevel.Items[2].CheckState = (chkLstLogLevel.Items[2].CheckState == CheckState.Checked)
                     ? CheckState.Unchecked
                     : CheckState.Checked;
                 return true;
@@ -253,9 +257,9 @@ namespace Analogy
 
             spltFilteringBoth.SplitterDistance = spltFilteringBoth.Width - 150;
             pnlFilteringLeft.Dock = DockStyle.Fill;
-            txtbIncludeText.MaskBox.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
-            txtbIncludeText.MaskBox.AutoCompleteSource = AutoCompleteSource.CustomSource;
-            txtbIncludeText.MaskBox.AutoCompleteCustomSource = autoCompleteInclude;
+            txtbInclude.MaskBox.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
+            txtbInclude.MaskBox.AutoCompleteSource = AutoCompleteSource.CustomSource;
+            txtbInclude.MaskBox.AutoCompleteCustomSource = autoCompleteInclude;
 
             txtbExclude.MaskBox.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
             txtbExclude.MaskBox.AutoCompleteSource = AutoCompleteSource.CustomSource;
@@ -269,19 +273,19 @@ namespace Analogy
             }
             if (Settings.SaveSearchFilters)
             {
-                txtbIncludeText.Text = Settings.IncludeText;
+                txtbInclude.Text = Settings.IncludeText;
                 txtbExclude.Text = Settings.ExcludedText;
                 txtbSource.Text = Settings.SourceText;
                 txtbModule.Text = Settings.ModuleText;
             }
             btswitchRefreshLog.Checked = true;
             gridColumnCategory.Visible = false;
-            logGrid.BestFitColumns();
+            LogGrid.BestFitColumns();
             btswitchExpand.Checked = true;
             splitContainerMain.Collapsed = true;
             if (Settings.StartupErrorLogLevel)
                 chkLstLogLevel.Items[1].CheckState = CheckState.Checked;
-            logGrid.Appearance.Row.Font = new Font(logGrid.Appearance.Row.Font.Name, Settings.FontSize);
+            LogGrid.Appearance.Row.Font = new Font(LogGrid.Appearance.Row.Font.Name, Settings.FontSize);
             btsAutoScrollToBottom.Checked = Settings.AutoScrollToLastMessage;
         }
 
@@ -307,7 +311,7 @@ namespace Analogy
                     gridColumn.FieldName = column.ColumnName;
                     gridColumn.OptionsFilter.FilterPopupMode = FilterPopupMode.CheckedList;
                     gridColumn.VisibleIndex = ExtensionManager.GetIndexForExtension(extension);
-                    logGrid.Columns.Add(gridColumn);
+                    LogGrid.Columns.Add(gridColumn);
                     gridColumn.Visible = true;
                 }
 
@@ -332,15 +336,15 @@ namespace Analogy
         {
             if (!(e is DXMouseEventArgs args))
                 return;
-            GridHitInfo hi = logGrid.CalcHitInfo(new Point(args.X, args.Y));
+            GridHitInfo hi = LogGrid.CalcHitInfo(new Point(args.X, args.Y));
 
             if (hi.RowHandle < 0) return;
-            int[] selRows = logGrid.GetSelectedRows();
+            int[] selRows = LogGrid.GetSelectedRows();
 
             if (selRows == null || selRows.Length != 1) return;
 
             int rownum = selRows.First();
-            _currentMassage = (AnalogyLogMessage)logGrid.GetRowCellValue(rownum, "Object");
+            _currentMassage = (AnalogyLogMessage)LogGrid.GetRowCellValue(rownum, "Object");
             LoadTextBoxes(_currentMassage);
             if (hasAnyInPlaceExtensions)
             {
@@ -355,7 +359,7 @@ namespace Analogy
                         if (column.FieldName.Equals(exColumn.ColumnName) &&
                             column.Caption.Equals(exColumn.ColumnCaption))
                         {
-                            var cellValue = logGrid.GetRowCellValue(rowHandle, exColumn.ColumnName);
+                            var cellValue = LogGrid.GetRowCellValue(rowHandle, exColumn.ColumnName);
                             AnalogyCellClickedEventArgs argsForEx =
                                 new AnalogyCellClickedEventArgs(exColumn.ColumnName, cellValue, _currentMassage);
                             extension.CellClicked(sender, argsForEx);
@@ -418,12 +422,18 @@ namespace Analogy
                 }
 
                 string text = view.GetRowCellDisplayText(e.RowHandle, view.Columns["Text"]);
-                if (chkbHighlight.Checked && _filterCriteriaInline.Match(text, txtbHighlight.Text))
+                if (chkbHighlight.Checked && FilterCriteriaObject.Match(text, txtbHighlight.Text, PreDefinedQueryType.Contains))
                 {
                     e.Appearance.BackColor = Settings.ColorSettings.GetHighlightColor();
                 }
 
-
+                foreach (PreDefineHighlight preDefineHighlight in Settings.PreDefinedQueries.Highlights)
+                {
+                    if (FilterCriteriaObject.Match(text, preDefineHighlight.Text, preDefineHighlight.PreDefinedQueryType))
+                    {
+                        e.Appearance.BackColor = preDefineHighlight.Color;
+                    }
+                }
             }
         }
 
@@ -521,7 +531,7 @@ namespace Analogy
         {
             if (!chkbIncludeText.Checked && !chkExclude.Checked)
             {
-                logGrid.ClearColumnsFilter();
+                LogGrid.ClearColumnsFilter();
                 gridColumnText.FilterInfo = null;
             }
 
@@ -532,7 +542,7 @@ namespace Analogy
         {
             if (!chkbIncludeText.Checked && !chkExclude.Checked)
             {
-                logGrid.ClearColumnsFilter();
+                LogGrid.ClearColumnsFilter();
                 gridColumnText.FilterInfo = null;
             }
 
@@ -540,10 +550,10 @@ namespace Analogy
         }
         private void txtbInclude_TextChanged(object sender, EventArgs e)
         {
-            if (OldTextInclude.Equals(txtbIncludeText.Text)) return;
-            OldTextInclude = txtbIncludeText.Text;
-            txtbHighlight.Text = txtbIncludeText.Text;
-            if (string.IsNullOrEmpty(txtbIncludeText.Text))
+            if (OldTextInclude.Equals(txtbInclude.Text)) return;
+            OldTextInclude = txtbInclude.Text;
+            txtbHighlight.Text = txtbInclude.Text;
+            if (string.IsNullOrEmpty(txtbInclude.Text))
             {
                 chkbIncludeText.Checked = false;
                 return;
@@ -665,9 +675,9 @@ namespace Analogy
             {
                 lockSlim.EnterReadLock();
                 string filter = _messageData.DefaultView.RowFilter;
-                if (logGrid.ActiveFilterEnabled && !string.IsNullOrEmpty(logGrid.ActiveFilterString))
+                if (LogGrid.ActiveFilterEnabled && !string.IsNullOrEmpty(LogGrid.ActiveFilterString))
                 {
-                    CriteriaOperator op = logGrid.ActiveFilterCriteria; //filterControl1.FilterCriteria  
+                    CriteriaOperator op = LogGrid.ActiveFilterCriteria; //filterControl1.FilterCriteria  
                     string filterString = CriteriaToWhereClauseHelper.GetDataSetWhere(op);
                     filter = $"{filter} and {filterString}";
                 }
@@ -694,9 +704,9 @@ namespace Analogy
                 lockSlim.EnterReadLock();
 
                 string filter = _messageData.DefaultView.RowFilter;
-                if (logGrid.ActiveFilterEnabled && !string.IsNullOrEmpty(logGrid.ActiveFilterString))
+                if (LogGrid.ActiveFilterEnabled && !string.IsNullOrEmpty(LogGrid.ActiveFilterString))
                 {
-                    CriteriaOperator op = logGrid.ActiveFilterCriteria; //filterControl1.FilterCriteria  
+                    CriteriaOperator op = LogGrid.ActiveFilterCriteria; //filterControl1.FilterCriteria  
                     string filterString = CriteriaToWhereClauseHelper.GetDataSetWhere(op);
                     filter = $"{filter} and {filterString}";
                 }
@@ -916,9 +926,9 @@ namespace Analogy
 #if DEBUG
                     Console.WriteLine(source);
 #endif
-                    logGrid.BeginDataUpdate();
+                    LogGrid.BeginDataUpdate();
                     table.AcceptChanges();
-                    logGrid.EndDataUpdate();
+                    LogGrid.EndDataUpdate();
                 }
                 finally
                 {
@@ -937,9 +947,9 @@ namespace Analogy
                     lockSlim.EnterWriteLock();
                     try
                     {
-                        logGrid.BeginDataUpdate();
+                        LogGrid.BeginDataUpdate();
                         _messageData.AcceptChanges();
-                        logGrid.EndDataUpdate();
+                        LogGrid.EndDataUpdate();
                         RefreshUIMessagesCount();
                     }
                     finally
@@ -979,7 +989,7 @@ namespace Analogy
         {
             _filterCriteriaInline.NewerThan = chkDateNewerThan.Checked ? deNewerThanFilter.DateTime : DateTime.MinValue;
             _filterCriteriaInline.OlderThan = chkDateOlderThan.Checked ? deOlderThanFilter.DateTime : DateTime.MaxValue;
-            _filterCriteriaInline.TextInclude = chkbIncludeText.Checked ? txtbIncludeText.Text : string.Empty;
+            _filterCriteriaInline.TextInclude = chkbIncludeText.Checked ? txtbInclude.Text : string.Empty;
             _filterCriteriaInline.TextExclude = chkExclude.Checked ? txtbExclude.Text + "|" + string.Join("|", _excludeMostCommon) : string.Empty;
 
 
@@ -1041,9 +1051,9 @@ namespace Analogy
             }
             Settings.ModuleText = Settings.SaveSearchFilters ? txtbModule.Text : string.Empty;
             string filter = _filterCriteriaInline.GetSqlExpression();
-            if (logGrid.ActiveFilterEnabled && !string.IsNullOrEmpty(logGrid.ActiveFilterString))
+            if (LogGrid.ActiveFilterEnabled && !string.IsNullOrEmpty(LogGrid.ActiveFilterString))
             {
-                CriteriaOperator op = logGrid.ActiveFilterCriteria; 
+                CriteriaOperator op = LogGrid.ActiveFilterCriteria;
                 string filterString = CriteriaToWhereClauseHelper.GetDataSetWhere(op);
                 filter = $"{filter} and {filterString}";
             }
@@ -1052,8 +1062,10 @@ namespace Analogy
             {
                 _messageData.BeginLoadData();
                 //todo:replace for performance
-                //gridControl.MainView= new DataView(_messageData, filter, null, DataViewRowState.CurrentRows);
-                _messageData.DefaultView.RowFilter = _filterCriteriaInline.GetSqlExpression(); ;
+                logGridFiltered.ActiveFilterString = _filterCriteriaInline.GetSqlExpression();
+                _messageData.DefaultView.RowFilter = _filterCriteriaInline.GetSqlExpression();
+                //gridControl.MainView = logGridFiltered;
+                //LogGrid = logGridFiltered;
                 _messageData.EndLoadData();
             }
             finally
@@ -1063,28 +1075,28 @@ namespace Analogy
 
             var location = LocateByValue(0, gridColumnObject, _currentMassage);
             if (location >= 0)
-                logGrid.FocusedRowHandle = location;
-            logGrid.RefreshData();
+                LogGrid.FocusedRowHandle = location;
+            LogGrid.RefreshData();
             RefreshUIMessagesCount();
 
         }
         public virtual int LocateByValue(int startRowHandle, GridColumn column, AnalogyLogMessage val)
         {
-            if (!logGrid.DataController.IsReady || val == null)
+            if (!LogGrid.DataController.IsReady || val == null)
                 return int.MinValue;
             startRowHandle = Math.Max(0, startRowHandle);
-            if (logGrid.IsServerMode)
+            if (LogGrid.IsServerMode)
             {
                 if (startRowHandle != 0)
                     throw new ArgumentException("Argument must be '0' in server mode.", nameof(startRowHandle));
             }
             try
             {
-                if (logGrid.IsServerMode)
-                    return logGrid.DataController.FindRowByValue(column.FieldName, val, null);
-                for (int rowHandle = startRowHandle; rowHandle < logGrid.DataController.VisibleListSourceRowCount; ++rowHandle)
+                if (LogGrid.IsServerMode)
+                    return LogGrid.DataController.FindRowByValue(column.FieldName, val, null);
+                for (int rowHandle = startRowHandle; rowHandle < LogGrid.DataController.VisibleListSourceRowCount; ++rowHandle)
                 {
-                    object rowCellValue = logGrid.GetRowCellValue(rowHandle, column.Caption);
+                    object rowCellValue = LogGrid.GetRowCellValue(rowHandle, column.Caption);
                     if (Equals(val, rowCellValue))
                         return rowHandle;
                 }
@@ -1191,34 +1203,9 @@ namespace Analogy
 
         }
 
-        private void tsmiOTAFull_Click(object sender, EventArgs e)
-        {
-            if (EnableOTA)
-            {
-                AnalogyOTAClient client = new AnalogyOTAClient(GetFilteredDataTable());
-                client.Show(this);
-            }
-            else
-            {
-                MessageBox.Show("Sending logs feature has been disabled", "Operation Is Not allowed",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
-        }
+  
 
-        private void tsBtnShare_Click(object sender, EventArgs e)
-        {
-            if (EnableOTA)
-            {
-                AnalogyOTAClient client = new AnalogyOTAClient(GetFilteredDataTable());
-                client.Show(this);
-            }
-            else
-            {
-                XtraMessageBox.Show("Sharing logs feature has been disabled", "Operation Is Not allowed",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
-        }
-
+       
 
         private void tmrNewData_Tick(object sender, EventArgs e)
         {
@@ -1232,13 +1219,13 @@ namespace Analogy
 
         private void txtbInclude_MouseEnter(object sender, EventArgs e)
         {
-            txtbIncludeText.Focus();
-            txtbIncludeText.SelectAll();
+            txtbInclude.Focus();
+            txtbInclude.SelectAll();
         }
 
         private void txtbInclude_Enter(object sender, EventArgs e)
         {
-            txtbIncludeText.SelectAll();
+            txtbInclude.SelectAll();
         }
 
         private void txtbExcludeSource_TextChanged(object sender, EventArgs e)
@@ -1312,7 +1299,7 @@ namespace Analogy
         {
 
             (AnalogyLogMessage message, _) = GetMessageFromSelectedRowInGrid();
-            int[] selRows = logGrid.GetSelectedRows();
+            int[] selRows = LogGrid.GetSelectedRows();
             if (message == null) return;
             lockSlim.EnterWriteLock();
 
@@ -1327,7 +1314,7 @@ namespace Analogy
             dtr["Module"] = message.Module ?? "";
             dtr["Object"] = message;
             dtr["ProcessID"] = message.ProcessID;
-            string dataSource = (string)logGrid.GetRowCellValue(selRows.First(), "DataProvider");
+            string dataSource = (string)LogGrid.GetRowCellValue(selRows.First(), "DataProvider");
             dtr["DataProvider"] = dataSource;
             if (diffStartTime > DateTime.MinValue)
             {
@@ -1355,7 +1342,7 @@ namespace Analogy
                 var LogMessage = currentRow["Object"] as AnalogyLogMessage;
                 var location = LocateByValue(0, gridColumnObject, LogMessage);
                 if (location >= 0)
-                    logGrid.FocusedRowHandle = location;
+                    LogGrid.FocusedRowHandle = location;
                 else
                     XtraMessageBox.Show("Cannot go to message", "Message not found", MessageBoxButtons.OK,
                         MessageBoxIcon.Error);
@@ -1401,7 +1388,7 @@ namespace Analogy
         {
             if (e.KeyCode == Keys.Enter)
             {
-                autoCompleteInclude.Add(txtbIncludeText.Text);
+                autoCompleteInclude.Add(txtbInclude.Text);
             }
         }
 
@@ -1469,25 +1456,25 @@ namespace Analogy
 
         private void btnUp_Click(object sender, EventArgs e)
         {
-            if (HighlightRows.Any() && logGrid.GetSelectedRows().Any())
+            if (HighlightRows.Any() && LogGrid.GetSelectedRows().Any())
             {
-                int selected = logGrid.GetSelectedRows().First();
+                int selected = LogGrid.GetSelectedRows().First();
                 if (HighlightRows.All(r => r >= selected))
-                    logGrid.SelectRow(HighlightRows.Last());
+                    LogGrid.SelectRow(HighlightRows.Last());
                 else
-                    logGrid.SelectRow(HighlightRows.First(r => r < selected));
+                    LogGrid.SelectRow(HighlightRows.First(r => r < selected));
             }
         }
 
         private void btnDown_Click(object sender, EventArgs e)
         {
-            if (HighlightRows.Any() && logGrid.GetSelectedRows().Any())
+            if (HighlightRows.Any() && LogGrid.GetSelectedRows().Any())
             {
-                int selected = logGrid.GetSelectedRows().First();
+                int selected = LogGrid.GetSelectedRows().First();
                 if (HighlightRows.All(r => r <= selected))
-                    logGrid.SelectRow(HighlightRows.First());
+                    LogGrid.SelectRow(HighlightRows.First());
                 else
-                    logGrid.SelectRow(HighlightRows.First(r => r > selected));
+                    LogGrid.SelectRow(HighlightRows.First(r => r > selected));
             }
         }
 
@@ -1606,29 +1593,16 @@ namespace Analogy
 
         private void chkLstLogLevel_SelectedIndexChanged(object sender, EventArgs e)
         {
-            chkbIncludeText.Checked = true;
-            chkExclude.Checked = true;
+            //chkbIncludeText.Checked = true;
+            //chkExclude.Checked = true;
             FilterHasChanged = true;
         }
 
-        private void chkLstLogLevel_DrawItem(object sender, ListBoxDrawItemEventArgs e)
-        {
-            //switch (e.Index)
-            //{
-            //    case 1:
-            //        e.Appearance.BackColor = Color.Red;
-            //        break;
-            //    case 2:
-            //        e.Appearance.BackColor = Color.Yellow;
-            //        break;
-            //}
-
-        }
 
         private void chkLstLogLevel_ItemCheck(object sender, DevExpress.XtraEditors.Controls.ItemCheckEventArgs e)
         {
-            chkbIncludeText.Checked = true;
-            chkExclude.Checked = true;
+            //chkbIncludeText.Checked = true;
+            //chkExclude.Checked = true;
             FilterHasChanged = true;
         }
 
@@ -1798,11 +1772,11 @@ namespace Analogy
 
         private (AnalogyLogMessage, string) GetMessageFromSelectedRowInGrid()
         {
-            int[] selRows = logGrid.GetSelectedRows();
+            int[] selRows = LogGrid.GetSelectedRows();
             if (selRows == null || !selRows.Any()) return (null, string.Empty);
             var row = selRows.First();
-            string datasource = (string)logGrid.GetRowCellValue(row, "DataProvider");
-            AnalogyLogMessage message = (AnalogyLogMessage)logGrid.GetRowCellValue(selRows.First(), "Object");
+            string datasource = (string)LogGrid.GetRowCellValue(row, "DataProvider");
+            AnalogyLogMessage message = (AnalogyLogMessage)LogGrid.GetRowCellValue(selRows.First(), "Object");
             return (message, datasource);
 
         }
@@ -1928,7 +1902,7 @@ namespace Analogy
         {
 
 
-            var count = logGrid.RowCount;
+            var count = LogGrid.RowCount;
 
             SaveFileDialog saveFileDialog = new SaveFileDialog();
             saveFileDialog.Filter = "Excel file XLSX (*.xlsx)|*.xlsx|Excel file XLS (*.XLS)|*.xls";
@@ -1943,7 +1917,7 @@ namespace Analogy
                     }
                     else
                     {
-                        logGrid.ExportToXlsx(saveFileDialog.FileName);
+                        LogGrid.ExportToXlsx(saveFileDialog.FileName);
                         OpenFolder(saveFileDialog.FileName);
                     }
                 }
@@ -1955,7 +1929,7 @@ namespace Analogy
                     }
                     else
                     {
-                        logGrid.ExportToXls(saveFileDialog.FileName);
+                        LogGrid.ExportToXls(saveFileDialog.FileName);
                         OpenFolder(saveFileDialog.FileName);
                     }
                 }
@@ -1969,7 +1943,7 @@ namespace Analogy
 
             if (saveFileDialog.ShowDialog(this) == DialogResult.OK)
             {
-                logGrid.ExportToCsv(saveFileDialog.FileName);
+                LogGrid.ExportToCsv(saveFileDialog.FileName);
                 OpenFolder(saveFileDialog.FileName);
             }
         }
@@ -1983,7 +1957,7 @@ namespace Analogy
             {
                 HtmlExportOptions op = new HtmlExportOptions();
                 op.ExportMode = HtmlExportMode.SingleFile;
-                logGrid.ExportToHtml(saveFileDialog.FileName, op);
+                LogGrid.ExportToHtml(saveFileDialog.FileName, op);
                 OpenFolder(saveFileDialog.FileName);
             }
         }
@@ -2030,9 +2004,9 @@ namespace Analogy
         {
             int row = e.FocusedRowHandle;
             if (row < 0) return;
-            AnalogyLogMessage m = (AnalogyLogMessage)logGrid.GetRowCellValue(e.FocusedRowHandle, "Object");
+            AnalogyLogMessage m = (AnalogyLogMessage)LogGrid.GetRowCellValue(e.FocusedRowHandle, "Object");
             LoadTextBoxes(m);
-            string dataProvider = (string)logGrid.GetRowCellValue(e.FocusedRowHandle, "DataProvider");
+            string dataProvider = (string)LogGrid.GetRowCellValue(e.FocusedRowHandle, "DataProvider");
             if (!LoadingInProgress)
             {
                 OnFocusedRowChanged?.Invoke(this, (dataProvider, m));
@@ -2041,19 +2015,19 @@ namespace Analogy
 
         private void tsmiIncreaseFont_Click(object sender, EventArgs e)
         {
-            Settings.FontSize = logGrid.Appearance.Row.Font.Size + 2;
-            logGrid.Appearance.Row.Font = new Font(logGrid.Appearance.Row.Font.Name, Settings.FontSize);
-            gridViewBookmarkedMessages.Appearance.Row.Font = new Font(logGrid.Appearance.Row.Font.Name, Settings.FontSize);
+            Settings.FontSize = LogGrid.Appearance.Row.Font.Size + 2;
+            LogGrid.Appearance.Row.Font = new Font(LogGrid.Appearance.Row.Font.Name, Settings.FontSize);
+            gridViewBookmarkedMessages.Appearance.Row.Font = new Font(LogGrid.Appearance.Row.Font.Name, Settings.FontSize);
             SaveGridLayout();
         }
 
         private void tsmiDecreaseFont_Click(object sender, EventArgs e)
         {
-            if (logGrid.Appearance.Row.Font.Size < 5) return;
+            if (LogGrid.Appearance.Row.Font.Size < 5) return;
             {
-                Settings.FontSize = logGrid.Appearance.Row.Font.Size - 2;
-                logGrid.Appearance.Row.Font = new Font(logGrid.Appearance.Row.Font.Name, Settings.FontSize);
-                gridViewBookmarkedMessages.Appearance.Row.Font = new Font(logGrid.Appearance.Row.Font.Name, Settings.FontSize);
+                Settings.FontSize = LogGrid.Appearance.Row.Font.Size - 2;
+                LogGrid.Appearance.Row.Font = new Font(LogGrid.Appearance.Row.Font.Name, Settings.FontSize);
+                gridViewBookmarkedMessages.Appearance.Row.Font = new Font(LogGrid.Appearance.Row.Font.Name, Settings.FontSize);
                 SaveGridLayout();
             }
         }
@@ -2162,7 +2136,7 @@ namespace Analogy
 
         private void sbtnTextInclude_Click(object sender, EventArgs e)
         {
-            txtbIncludeText.Text = "";
+            txtbInclude.Text = "";
         }
 
         private void sbtnTextExclude_Click(object sender, EventArgs e)
@@ -2277,6 +2251,33 @@ namespace Analogy
             (AnalogyLogMessage message, _) = GetMessageFromSelectedRowInGrid();
             deOlderThanFilter.DateTime = message.Date;
             chkDateOlderThan.Checked = true;
+        }
+
+        private void sbtnMoreHighlight_Click(object sender, EventArgs e)
+        {
+            UserSettingsForm user = new UserSettingsForm(1);
+            user.ShowDialog(this);
+        }
+
+        private void sbtnPreDefinedFilters_Click(object sender, EventArgs e)
+        {
+            if (!Settings.PreDefinedQueries.Filters.Any()) return;
+            contextMenuStripFilters.Items.Clear();
+            foreach (PreDefineFilter filter in Settings.PreDefinedQueries.Filters)
+            {
+
+                ToolStripMenuItem item = new ToolStripMenuItem(filter.ToString());
+                item.Click += (s, arg) =>
+                {
+                    txtbInclude.Text = filter.IncludeText;
+                    txtbExclude.Text = filter.ExcludeText;
+                    txtbSource.Text = filter.Sources;
+                    txtbModule.Text = filter.Modules;
+                };
+                contextMenuStripFilters.Items.Add(item);
+            }
+
+            contextMenuStripFilters.Show(sbtnPreDefinedFilters.PointToScreen(sbtnPreDefinedFilters.Location));
         }
     }
 }

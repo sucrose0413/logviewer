@@ -1,13 +1,14 @@
-﻿using DevExpress.LookAndFeel;
-using DevExpress.XtraEditors;
 using System;
-using System.Diagnostics;
+using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows.Forms;
+using DevExpress.LookAndFeel;
+using DevExpress.XtraEditors;
 
 namespace Analogy
 {
-    public class Program
+    static class Program
     {
         private static UserSettingsManager Settings => UserSettingsManager.UserSettings;
         /// <summary>
