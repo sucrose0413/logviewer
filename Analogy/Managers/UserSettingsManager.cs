@@ -7,6 +7,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using Analogy.DataProviders.Extensions;
 using Analogy.Interfaces;
+using Analogy.Interfaces.DataTypes;
 using Analogy.Interfaces.Factories;
 using Analogy.Managers;
 using Analogy.Properties;
@@ -64,7 +65,12 @@ namespace Analogy
         public List<FactorySettings> FactoriesSettings { get; set; }
         public Guid LastOpenedDataProvider { get; set; }
         public bool RememberLastOpenedDataProvider { get; set; }
+        public bool RememberLastSearches { get; set; }
         public PreDefinedQueries PreDefinedQueries { get; set; }
+        public int NumberOfLastSearches { get; set; }
+        public List<string> LastSearchesInclude { get; set; }
+        public List<string> LastSearchesExclude { get; set; }
+        public int AnalogyInternalLogPeriod { get; set; }
         public UserSettingsManager()
         {
             Load();
@@ -72,6 +78,7 @@ namespace Analogy
 
         public void Load()
         {
+            AnalogyInternalLogPeriod = 5;
             if (Settings.Default.UpgradeRequired)
             {
                 Settings.Default.Upgrade();
@@ -112,8 +119,13 @@ namespace Analogy
             FactoriesOrder = ParseSettings<List<Guid>>(Settings.Default.FactoriesOrder);
             FactoriesSettings = ParseSettings<List<FactorySettings>>(Settings.Default.FactoriesSettings);
             LastOpenedDataProvider = Settings.Default.LastOpenedDataProvider;
-            RememberLastOpenedDataProvider = Settings.Default.RememberLastOpenedDataProvider;
             PreDefinedQueries = ParseSettings<PreDefinedQueries>(Settings.Default.PreDefinedQueries);
+            RememberLastOpenedDataProvider = Settings.Default.RememberLastOpenedDataProvider;
+            RememberLastSearches = Settings.Default.RememberLastSearches;
+            LastSearchesInclude = ParseSettings<List<string>>(Settings.Default.LastSearchesInclude);
+            LastSearchesExclude = ParseSettings<List<string>>(Settings.Default.LastSearchesExclude);
+            NumberOfLastSearches = Settings.Default.NumberOfLastSearches;
+
         }
 
         private T ParseSettings<T>(string data) where T : new()
@@ -126,7 +138,7 @@ namespace Analogy
             }
             catch (Exception e)
             {
-                AnalogyLogManager.Instance.LogError("Error during parsing: " + e);
+                AnalogyLogManager.Instance.LogError("Error during parsing: " + e, nameof(UserSettingsManager));
                 return new T();
             }
 
@@ -168,6 +180,10 @@ namespace Analogy
             Settings.Default.LastOpenedDataProvider = LastOpenedDataProvider;
             Settings.Default.RememberLastOpenedDataProvider = RememberLastOpenedDataProvider;
             Settings.Default.PreDefinedQueries = JsonConvert.SerializeObject(PreDefinedQueries);
+            Settings.Default.RememberLastSearches = RememberLastSearches;
+            Settings.Default.NumberOfLastSearches = NumberOfLastSearches;
+            Settings.Default.LastSearchesInclude = JsonConvert.SerializeObject(LastSearchesInclude.Take(NumberOfLastSearches).ToList());
+            Settings.Default.LastSearchesExclude = JsonConvert.SerializeObject(LastSearchesExclude.Take(NumberOfLastSearches).ToList());
             Settings.Default.Save();
 
         }
@@ -236,7 +252,23 @@ namespace Analogy
                                                factory.UserSettingFileAssociations != null &&
                                                factory.UserSettingFileAssociations.Any(i =>
                                                    Utils.MatchedAll(i, files)));
-
+        public bool AddNewSearchesEntryToLists(string text, bool include)
+        {
+            if (include)
+            {
+                if (LastSearchesInclude.Contains(text, StringComparison.InvariantCultureIgnoreCase))
+                    return false;
+                LastSearchesInclude.Add(text);
+                return true;
+            }
+            else
+            {
+                if (LastSearchesExclude.Contains(text, StringComparison.InvariantCultureIgnoreCase))
+                    return false;
+                LastSearchesExclude.Add(text);
+                return true;
+            }
+        }
     }
     [Serializable]
     public class LogParserSettingsContainer
@@ -351,7 +383,7 @@ namespace Analogy
         }
 
         public void AddHighlight(string text, PreDefinedQueryType type, Color color) => Highlights.Add(new PreDefineHighlight(type, text, color));
-        public void AddFilter(string includeText, string excludeText, string sources, string modules) => Filters.Add(new PreDefineFilter(includeText,excludeText,sources,modules));
+        public void AddFilter(string includeText, string excludeText, string sources, string modules) => Filters.Add(new PreDefineFilter(includeText, excludeText, sources, modules));
         public void AddAlert(string includeText, string excludeText, string sources, string modules) => Alerts.Add(new PreDefineAlert(includeText, excludeText, sources, modules));
 
         public void RemoveHighlight(PreDefineHighlight highlight)
