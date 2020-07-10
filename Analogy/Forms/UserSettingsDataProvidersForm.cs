@@ -1,10 +1,11 @@
-﻿using DevExpress.XtraEditors;
+﻿using Analogy.DataProviders.Extensions;
+using Analogy.Managers;
+using Analogy.Properties;
+using DevExpress.XtraEditors;
+using DevExpress.XtraTab;
 using System;
 using System.Linq;
 using System.Windows.Forms;
-using Analogy.DataProviders.Extensions;
-using Analogy.Managers;
-using DevExpress.XtraTab;
 
 namespace Analogy
 {
@@ -49,7 +50,7 @@ namespace Analogy
         private void LoadSettings()
         {
 
-             AddExternalUserControlSettings();
+            AddExternalUserControlSettings();
         }
 
         private void AddExternalUserControlSettings()
@@ -60,15 +61,16 @@ namespace Analogy
                 tab.Text = settings.Title;
                 UserControl uc = settings.DataProviderSettings;
                 tab.Controls.Add(uc);
-                tab.Image = settings.Icon;
+                tab.Image = settings.LargeImage ?? Resources.Technology_32x32;
                 //ab.
                 uc.Dock = DockStyle.Fill;
                 tabControlMain.TabPages.Add(tab);
             }
         }
 
-        private async void UserSettingsForm_Load(object sender, EventArgs e)
+        private void UserSettingsForm_Load(object sender, EventArgs e)
         {
+            Icon = UserSettingsManager.UserSettings.GetIcon();
             LoadSettings();
 
             if (_initialSelection >= 0)

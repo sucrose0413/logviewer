@@ -1,11 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Drawing;
-using System.IO;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using Analogy.DataProviders.Extensions;
+﻿using Analogy.DataProviders;
 using Analogy.Interfaces;
 using Analogy.Interfaces.DataTypes;
 using Analogy.Interfaces.Factories;
@@ -13,6 +6,14 @@ using Analogy.Managers;
 using Analogy.Properties;
 using Analogy.Types;
 using Newtonsoft.Json;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Drawing;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 
 namespace Analogy
 {
@@ -33,8 +34,10 @@ namespace Analogy
         public string SourceText { get; set; }
         public string ModuleText { get; set; }
         public List<(Guid ID, string FileName)> RecentFiles { get; set; }
+        public List<(Guid ID, string Path)> RecentFolders { get; set; }
         public bool ShowHistoryOfClearedMessages { get; set; }
         public int RecentFilesCount { get; set; }
+        public int RecentFoldersCount { get; set; }
         public bool EnableUserStatistics { get; set; }
         public TimeSpan AnalogyRunningTime { get; set; }
         public uint AnalogyLaunches { get; set; }
@@ -71,6 +74,20 @@ namespace Analogy
         public List<string> LastSearchesInclude { get; set; }
         public List<string> LastSearchesExclude { get; set; }
         public int AnalogyInternalLogPeriod { get; set; }
+        public List<string> AdditionalProbingLocations { get; set; }
+        public bool SingleInstance { get; set; }
+        public string AnalogyIcon { get; set; }
+        public string LogGridFileName => Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? string.Empty, "AnalogyGridlayout.xml");
+        public string DateTimePattern { get; set; }
+        public UpdateMode UpdateMode { get; set; }
+        public DateTime LastUpdate { get; set; }
+        public GithubReleaseEntry LastVersionChecked { get; set; }
+        public string GitHubToken { get; } = Environment.GetEnvironmentVariable("AnalogyGitHub_Token");
+        public bool MinimizedToTrayBar { get; set; }
+        public bool CheckAdditionalInformation { get; set; }
+
+        public AnalogyPositionState AnalogyPosition { get; set; }
+
         public UserSettingsManager()
         {
             Load();
@@ -86,6 +103,10 @@ namespace Analogy
                 Settings.Default.Save();
             }
 
+            DateTimePattern = !string.IsNullOrEmpty(Settings.Default.DateTimePattern)
+                ? Settings.Default.DateTimePattern
+                : "yyyy.MM.dd HH:mm:ss.ff";
+            AnalogyIcon = Settings.Default.AnalogyIcon;
             ApplicationSkinName = Settings.Default.ApplicationSkinName;
             EnableUserStatistics = Settings.Default.EnableUserStatistics;
             AnalogyRunningTime = Settings.Default.AnalogyRunningTime;
@@ -98,6 +119,8 @@ namespace Analogy
             SaveSearchFilters = Settings.Default.SaveSearchFilters;
             RecentFiles = ParseSettings<List<(Guid ID, string FileName)>>(Settings.Default.RecentFiles);
             RecentFilesCount = Settings.Default.RecentFilesCount;
+            RecentFoldersCount = Settings.Default.RecentFoldersCount;
+            RecentFolders = ParseSettings<List<(Guid ID, string Path)>>(Settings.Default.RecentFolders);
             EnableFileCaching = Settings.Default.EnableFileCaching;
             LoadExtensionsOnStartup = Settings.Default.LoadExtensionsOnStartup;
             StartupExtensions = ParseSettings<List<Guid>>(Settings.Default.StartupExtensions);
@@ -117,7 +140,7 @@ namespace Analogy
             ColorSettings = ParseSettings<ColorSettings>(Settings.Default.ColorSettings);
             DefaultDescendOrder = Settings.Default.DefaultDescendOrder;
             FactoriesOrder = ParseSettings<List<Guid>>(Settings.Default.FactoriesOrder);
-            FactoriesSettings = ParseSettings<List<FactorySettings>>(Settings.Default.FactoriesSettings);
+            FactoriesSettings = ParseSettings<List<FactorySettings>>(Settings.Default.FactoriesSettings).Where(f => f.FactoryId != Guid.Empty).ToList();
             LastOpenedDataProvider = Settings.Default.LastOpenedDataProvider;
             PreDefinedQueries = ParseSettings<PreDefinedQueries>(Settings.Default.PreDefinedQueries);
             RememberLastOpenedDataProvider = Settings.Default.RememberLastOpenedDataProvider;
@@ -125,7 +148,29 @@ namespace Analogy
             LastSearchesInclude = ParseSettings<List<string>>(Settings.Default.LastSearchesInclude);
             LastSearchesExclude = ParseSettings<List<string>>(Settings.Default.LastSearchesExclude);
             NumberOfLastSearches = Settings.Default.NumberOfLastSearches;
+            AdditionalProbingLocations = ParseSettings<List<string>>(Settings.Default.AdditionalProbingLocations);
+            SingleInstance = Settings.Default.SingleInstance;
+            LastUpdate = Settings.Default.LastUpdate;
+            LastVersionChecked = ParseSettings<GithubReleaseEntry>(Settings.Default.LastVersionChecked);
+            switch (Settings.Default.UpdateMode)
+            {
+                case 0:
+                    UpdateMode = UpdateMode.Never;
+                    break;
+                case 1:
+                    UpdateMode = UpdateMode.EachStartup;
+                    break;
+                case 2:
+                    UpdateMode = UpdateMode.OnceAWeek;
+                    break;
+                case 3:
+                    UpdateMode = UpdateMode.OnceAMonth;
+                    break;
+            }
 
+            MinimizedToTrayBar = Settings.Default.MinimizedToTrayBar;
+            CheckAdditionalInformation = Settings.Default.CheckAdditionalInformation; 
+            AnalogyPosition = ParseSettings<AnalogyPositionState>(Settings.Default.AnalogyPosition) ?? new AnalogyPositionState();
         }
 
         private T ParseSettings<T>(string data) where T : new()
@@ -146,6 +191,10 @@ namespace Analogy
         }
         public void Save()
         {
+            Settings.Default.DateTimePattern = !string.IsNullOrEmpty(DateTimePattern)
+                ? DateTimePattern
+                : "yyyy.MM.dd HH:mm:ss.ff";
+            Settings.Default.AnalogyIcon = AnalogyIcon;
             Settings.Default.ApplicationSkinName = ApplicationSkinName;
             Settings.Default.EnableUserStatistics = EnableUserStatistics;
             Settings.Default.AnalogyRunningTime = AnalogyRunningTime;
@@ -157,6 +206,8 @@ namespace Analogy
             Settings.Default.SaveSearchFilters = SaveSearchFilters;
             Settings.Default.RecentFilesCount = RecentFilesCount;
             Settings.Default.RecentFiles = JsonConvert.SerializeObject(RecentFiles.Take(RecentFilesCount).ToList());
+            Settings.Default.RecentFoldersCount = RecentFoldersCount;
+            Settings.Default.RecentFolders = JsonConvert.SerializeObject(RecentFolders.Take(RecentFoldersCount).ToList());
             Settings.Default.EnableFileCaching = EnableFileCaching;
             Settings.Default.LoadExtensionsOnStartup = LoadExtensionsOnStartup;
             Settings.Default.StartupExtensions = JsonConvert.SerializeObject(StartupExtensions);
@@ -184,6 +235,14 @@ namespace Analogy
             Settings.Default.NumberOfLastSearches = NumberOfLastSearches;
             Settings.Default.LastSearchesInclude = JsonConvert.SerializeObject(LastSearchesInclude.Take(NumberOfLastSearches).ToList());
             Settings.Default.LastSearchesExclude = JsonConvert.SerializeObject(LastSearchesExclude.Take(NumberOfLastSearches).ToList());
+            Settings.Default.AdditionalProbingLocations = JsonConvert.SerializeObject(AdditionalProbingLocations);
+            Settings.Default.SingleInstance = SingleInstance;
+            Settings.Default.LastUpdate = LastUpdate;
+            Settings.Default.UpdateMode = (int)UpdateMode;
+            Settings.Default.LastVersionChecked = JsonConvert.SerializeObject(LastVersionChecked);
+            Settings.Default.MinimizedToTrayBar = MinimizedToTrayBar;
+            Settings.Default.CheckAdditionalInformation=CheckAdditionalInformation;
+            Settings.Default.AnalogyPosition = JsonConvert.SerializeObject(AnalogyPosition);
             Settings.Default.Save();
 
         }
@@ -194,7 +253,11 @@ namespace Analogy
             if (!RecentFiles.Contains((iD, file)))
                 RecentFiles.Insert(0, (iD, file));
         }
-
+        public void AddToRecentFolders(Guid iD, string path)
+        {
+            if (!RecentFolders.Contains((iD, path)))
+                RecentFolders.Insert(0, (iD, path));
+        }
         public void ClearStatistics()
         {
             AnalogyRunningTime = TimeSpan.FromSeconds(0);
@@ -210,29 +273,26 @@ namespace Analogy
         public FactorySettings GetFactorySetting(Guid factoryID)
         {
             bool Exists(Guid guid) => guid == factoryID;
-            if (FactoriesSettings.Exists(f => Exists(f.FactoryGuid)))
+            if (FactoriesSettings.Exists(f => Exists(f.FactoryId)))
             {
-                return FactoriesSettings.Single(f => Exists(f.FactoryGuid));
+                return FactoriesSettings.Single(f => Exists(f.FactoryId));
             }
 
             return null;
         }
         public FactorySettings GetOrAddFactorySetting(IAnalogyFactory factory)
         {
-            bool Exists(Guid guid) => guid == factory.FactoryID;
-            if (FactoriesSettings.Exists(f => Exists(f.FactoryGuid)))
+            bool Exists(Guid guid) => guid == factory.FactoryId;
+            if (FactoriesSettings.Exists(f => Exists(f.FactoryId)))
             {
-                return FactoriesSettings.Single(f => Exists(f.FactoryGuid));
+                return FactoriesSettings.Single(f => Exists(f.FactoryId));
             }
 
             var createNew = new FactorySettings
             {
-                FactoryGuid = factory.FactoryID,
+                FactoryId = factory.FactoryId,
                 Status = DataProviderFactoryStatus.NotSet,
                 UserSettingFileAssociations = new List<string>()
-                //factory.DataProviders.Items
-                //.Where(itm => itm is IAnalogyOfflineDataProvider)
-                //.SelectMany(itm => ((IAnalogyOfflineDataProvider)itm).SupportFormats).ToList()
             };
             FactoriesSettings.Add(createNew);
             return createNew;
@@ -269,6 +329,19 @@ namespace Analogy
                 return true;
             }
         }
+
+        public Icon GetIcon()
+        {
+            return AnalogyIcon == "Dark" ? Resources.AnalogyIconDark : Resources.AnalogyIconLight;
+        }
+
+
+        public IEnumerable<(Guid ID, string FileName)> GetRecentFiles(Guid offlineAnalogyId) =>
+            RecentFiles.Where(itm => itm.ID == offlineAnalogyId);
+
+        public IEnumerable<(Guid ID, string Path)> GetRecentFolders(Guid offlineAnalogyId) =>
+            RecentFolders.Where(itm => itm.ID == offlineAnalogyId);
+
     }
     [Serializable]
     public class LogParserSettingsContainer
@@ -289,9 +362,14 @@ namespace Analogy
         public Dictionary<AnalogyLogLevel, Color> LogLevelColors { get; set; }
 
         public Color HighlightColor { get; set; }
+        public Color NewMessagesColor { get; set; }
+        public bool EnableNewMessagesColor { get; set; }
+        public bool OverrideLogLevelColor { get; set; }
+
         public ColorSettings()
         {
             HighlightColor = Color.Aqua;
+            NewMessagesColor = Color.PaleTurquoise;
             var logLevelValues = Enum.GetValues(typeof(AnalogyLogLevel));
             LogLevelColors = new Dictionary<AnalogyLogLevel, Color>(logLevelValues.Length);
 
@@ -340,9 +418,11 @@ namespace Analogy
         public Color GetColorForLogLevel(AnalogyLogLevel level) => LogLevelColors[level];
 
         public Color GetHighlightColor() => HighlightColor;
+        public Color GetNewMessagesColor() => NewMessagesColor;
 
         public void SetColorForLogLevel(AnalogyLogLevel level, Color value) => LogLevelColors[level] = value;
         public void SetHighlightColor(Color value) => HighlightColor = value;
+        public void SetNewMessagesColor(Color value) => NewMessagesColor = value;
         public string AsJson() => JsonConvert.SerializeObject(this);
         public static ColorSettings FromJson(string fileName) => JsonConvert.DeserializeObject<ColorSettings>(fileName);
     }
@@ -351,7 +431,7 @@ namespace Analogy
     public class FactorySettings
     {
         public string FactoryName { get; set; }
-        public Guid FactoryGuid { get; set; }
+        public Guid FactoryId { get; set; }
         public List<string> UserSettingFileAssociations { get; set; }
         public DataProviderFactoryStatus Status { get; set; }
 
@@ -359,6 +439,8 @@ namespace Analogy
         {
             UserSettingFileAssociations = new List<string>();
         }
+        public override string ToString() => $"{nameof(FactoryName)}: {FactoryName}, {nameof(FactoryId)}: {FactoryId}, {nameof(Status)}: {Status}";
+
     }
 
     public enum PreDefinedQueryType

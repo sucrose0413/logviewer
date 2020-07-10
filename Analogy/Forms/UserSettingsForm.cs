@@ -1,14 +1,18 @@
-﻿using DevExpress.XtraEditors;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Windows.Forms;
-using Analogy.DataSources;
-using Analogy.Interfaces;
+﻿using Analogy.Interfaces;
 using Analogy.Managers;
+using Analogy.Properties;
 using Analogy.Types;
 using DevExpress.Utils;
+using DevExpress.XtraEditors;
+using DevExpress.XtraGrid.Views.Grid.ViewInfo;
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Threading;
+using System.Windows.Forms;
 
 namespace Analogy
 {
@@ -29,6 +33,7 @@ namespace Analogy
             public override string ToString() => $"{Name} ({ID})";
         }
 
+        private DataTable messageData;
         private UserSettingsManager Settings { get; } = UserSettingsManager.UserSettings;
         private int InitialSelection = -1;
 
@@ -36,19 +41,63 @@ namespace Analogy
         {
             InitializeComponent();
             SetupEventsHandlers();
+
+
+        }
+
+        private void SetupExampleMessage(string text)
+        {
+            DataRow dtr = messageData.NewRow();
+            dtr.BeginEdit();
+            dtr["Date"] = DateTime.Now;
+            dtr["Text"] = text;
+            dtr["Source"] = "Analogy";
+            dtr["Level"] = AnalogyLogLevel.Event.ToString();
+            dtr["Class"] = AnalogyLogClass.General.ToString();
+            dtr["Category"] = "None";
+            dtr["User"] = "None";
+            dtr["Module"] = "Analogy";
+            dtr["ProcessID"] = Process.GetCurrentProcess().Id;
+            dtr["ThreadID"] = Thread.CurrentThread.ManagedThreadId;
+            dtr["DataProvider"] = string.Empty;
+            dtr["MachineName"] = "None";
+            dtr.EndEdit();
+            messageData.Rows.Add(dtr);
+            messageData.AcceptChanges();
         }
 
         public UserSettingsForm(int tabIndex) : this()
         {
             InitialSelection = tabIndex;
         }
-        public UserSettingsForm(string tabName) : this()
-        {
-            var tab = tabControlMain.TabPages.SingleOrDefault(t => t.Name == tabName);
-            if (tab != null)
-                InitialSelection = tab.TabIndex;
-        }
 
+        private void UserSettingsForm_Load(object sender, EventArgs e)
+        {
+            ShowIcon = true;
+            logGrid.MouseDown += logGrid_MouseDown;
+            Icon = UserSettingsManager.UserSettings.GetIcon();
+            LoadSettings();
+            if (InitialSelection >= 0)
+                tabControlMain.SelectedTabPageIndex = InitialSelection;
+            if (File.Exists(Settings.LogGridFileName))
+            {
+                gridControl.MainView.RestoreLayoutFromXml(Settings.LogGridFileName);
+            }
+            messageData = Utils.DataTableConstructor();
+            gridControl.DataSource = messageData.DefaultView;
+            SetupExampleMessage("Test 1");
+            SetupExampleMessage("Test 2");
+
+        }
+        void logGrid_MouseDown(object sender, MouseEventArgs e)
+        {
+            GridHitInfo info = logGrid.CalcHitInfo(e.Location);
+            if (info.InColumnPanel)
+            {
+                teHeader.Tag = info.Column;
+                teHeader.Text = info.Column.Caption;
+            }
+        }
         private void SetupEventsHandlers()
         {
             tsAutoComplete.IsOnChanged += (s, e) => { Settings.RememberLastSearches = tsAutoComplete.IsOn; };
@@ -59,10 +108,16 @@ namespace Analogy
         }
         private void LoadSettings()
         {
+            tsRememberLastPositionAndState.IsOn = Settings.AnalogyPosition.RememberLastPosition;
+            logGrid.Columns["Date"].DisplayFormat.FormatType = FormatType.DateTime;
+            logGrid.Columns["Date"].DisplayFormat.FormatString = Settings.DateTimePattern;
             tsHistory.IsOn = Settings.ShowHistoryOfClearedMessages;
+            teDateTimeFormat.Text = Settings.DateTimePattern;
             tsFilteringExclude.IsOn = Settings.SaveSearchFilters;
+            listBoxFoldersProbing.Items.AddRange(Settings.AdditionalProbingLocations.ToArray());
             tsAutoComplete.IsOn = Settings.RememberLastSearches;
-            nudRecent.Value = Settings.RecentFilesCount;
+            nudRecentFiles.Value = Settings.RecentFilesCount;
+            nudRecentFolders.Value = Settings.RecentFoldersCount;
             tsUserStatistics.IsOn = Settings.EnableUserStatistics;
             //tsSimpleMode.IsOn = Settings.SimpleMode;
             tsFileCaching.IsOn = Settings.EnableFileCaching;
@@ -88,7 +143,7 @@ namespace Analogy
             foreach (var extension in extensions)
             {
 
-                chklItems.Items.Add(extension, Settings.StartupExtensions.Contains(extension.ExtensionID));
+                chklItems.Items.Add(extension, Settings.StartupExtensions.Contains(extension.ID));
                 chklItems.DisplayMember = "DisplayName";
 
             }
@@ -107,14 +162,14 @@ namespace Analogy
             {
                 FactorySettings factory = Settings.GetFactorySetting(setting);
                 if (factory == null) continue;
-                FactoryCheckItem itm = new FactoryCheckItem(factory.FactoryName, factory.FactoryGuid);
+                FactoryCheckItem itm = new FactoryCheckItem(factory.FactoryName, factory.FactoryId);
                 chkLstDataProviderStatus.Items.Add(itm, factory.Status == DataProviderFactoryStatus.Enabled);
             }
             //add missing:
-            foreach (var factory in Settings.FactoriesSettings.Where(itm => !Settings.FactoriesOrder.Contains(itm.FactoryGuid)))
+            foreach (var factory in Settings.FactoriesSettings.Where(itm => !Settings.FactoriesOrder.Contains(itm.FactoryId)))
             {
 
-                FactoryCheckItem itm = new FactoryCheckItem(factory.FactoryName, factory.FactoryGuid);
+                FactoryCheckItem itm = new FactoryCheckItem(factory.FactoryName, factory.FactoryId);
                 chkLstDataProviderStatus.Items.Add(itm, factory.Status != DataProviderFactoryStatus.Disabled);
             }
 
@@ -126,9 +181,22 @@ namespace Analogy
             lboxAlerts.DataSource = Settings.PreDefinedQueries.Alerts;
             lboxFilters.DataSource = Settings.PreDefinedQueries.Filters;
             nudAutoCompleteCount.Value = Settings.NumberOfLastSearches;
-
+            tsSingleInstance.IsOn = Settings.SingleInstance;
+            if (Settings.AnalogyIcon == "Light")
+            {
+                rbtnLightIconColor.Checked = true;
+            }
+            else
+            {
+                rbtnDarkIconColor.Checked = true;
+            }
             LoadColorSettings();
+            cbUpdates.Properties.Items.AddRange(typeof(UpdateMode).GetDisplayValues().Values);
+            cbUpdates.SelectedItem = UpdateManager.Instance.UpdateMode.GetDisplay();
+            tsTraybar.IsOn = Settings.MinimizedToTrayBar;
+            tsCheckAdditionalInformation.IsOn = Settings.CheckAdditionalInformation;
         }
+
         private void SaveSetting()
         {
             Settings.ColorSettings.SetColorForLogLevel(AnalogyLogLevel.Unknown, cpeLogLevelUnknown.Color);
@@ -140,14 +208,19 @@ namespace Analogy
             Settings.ColorSettings.SetColorForLogLevel(AnalogyLogLevel.Warning, cpeLogLevelWarning.Color);
             Settings.ColorSettings.SetColorForLogLevel(AnalogyLogLevel.Error, cpeLogLevelError.Color);
             Settings.ColorSettings.SetColorForLogLevel(AnalogyLogLevel.Critical, cpeLogLevelCritical.Color);
-            Settings.ColorSettings.SetColorForLogLevel(AnalogyLogLevel.AnalogyInformation, cpeLogLevelAnalogyInformation.Color);
+            Settings.ColorSettings.SetColorForLogLevel(AnalogyLogLevel.AnalogyInformation,
+                cpeLogLevelAnalogyInformation.Color);
             Settings.ColorSettings.SetHighlightColor(cpeHighlightColor.Color);
-
+            Settings.ColorSettings.SetNewMessagesColor(cpeNewMessagesColor.Color);
+            Settings.ColorSettings.EnableNewMessagesColor = ceNewMessagesColor.Checked;
+            Settings.ColorSettings.OverrideLogLevelColor = ceOverrideLogLevelColor.Checked;
+            Settings.RecentFilesCount = (int) nudRecentFiles.Value;
+            Settings.RecentFoldersCount = (int) nudRecentFolders.Value;
             List<Guid> order = (from FactoryCheckItem itm in chkLstDataProviderStatus.Items select (itm.ID)).ToList();
             var checkedItem = chkLstDataProviderStatus.CheckedItems.Cast<FactoryCheckItem>().ToList();
             foreach (Guid guid in order)
             {
-                var factory = Settings.FactoriesSettings.SingleOrDefault(f => f.FactoryGuid == guid);
+                var factory = Settings.FactoriesSettings.SingleOrDefault(f => f.FactoryId == guid);
                 if (factory != null)
                 {
                     factory.Status = checkedItem.Exists(f => f.ID == guid)
@@ -155,9 +228,19 @@ namespace Analogy
                         : DataProviderFactoryStatus.Disabled;
                 }
             }
+
             Settings.RememberLastOpenedDataProvider = tsRememberLastOpenedDataProvider.IsOn;
             Settings.RememberLastSearches = tsAutoComplete.IsOn;
             Settings.UpdateOrder(order);
+            Settings.AdditionalProbingLocations = listBoxFoldersProbing.Items.Cast<string>().ToList();
+            Settings.SingleInstance = tsSingleInstance.IsOn;
+            Settings.AnalogyIcon = rbtnLightIconColor.Checked ? "Light" : "Dark";
+            var options = typeof(UpdateMode).GetDisplayValues();
+            UpdateManager.Instance.UpdateMode = (UpdateMode) Enum.Parse(typeof(UpdateMode),
+                options.Single(k => k.Value == cbUpdates.SelectedItem.ToString()).Key, true);
+            Settings.MinimizedToTrayBar = tsTraybar.IsOn;
+            Settings.CheckAdditionalInformation = tsCheckAdditionalInformation.IsOn;
+            Settings.AnalogyPosition.RememberLastPosition = tsRememberLastPositionAndState.IsOn;
             Settings.Save();
         }
 
@@ -172,9 +255,11 @@ namespace Analogy
             cpeLogLevelWarning.Color = Settings.ColorSettings.GetColorForLogLevel(AnalogyLogLevel.Warning);
             cpeLogLevelError.Color = Settings.ColorSettings.GetColorForLogLevel(AnalogyLogLevel.Error);
             cpeLogLevelCritical.Color = Settings.ColorSettings.GetColorForLogLevel(AnalogyLogLevel.Critical);
-            cpeLogLevelAnalogyInformation.Color =
-                Settings.ColorSettings.GetColorForLogLevel(AnalogyLogLevel.AnalogyInformation);
+            cpeLogLevelAnalogyInformation.Color = Settings.ColorSettings.GetColorForLogLevel(AnalogyLogLevel.AnalogyInformation);
             cpeHighlightColor.Color = Settings.ColorSettings.GetHighlightColor();
+            cpeNewMessagesColor.Color = Settings.ColorSettings.GetNewMessagesColor();
+            ceNewMessagesColor.Checked = Settings.ColorSettings.EnableNewMessagesColor;
+            ceOverrideLogLevelColor.Checked = Settings.ColorSettings.OverrideLogLevelColor;
         }
 
 
@@ -189,18 +274,6 @@ namespace Analogy
             Settings.ShowHistoryOfClearedMessages = tsHistory.IsOn;
         }
 
-        private async void UserSettingsForm_Load(object sender, EventArgs e)
-        {
-            LoadSettings();
-            if (InitialSelection >= 0)
-                tabControlMain.SelectedTabPageIndex = InitialSelection;
-
-        }
-
-        private void nudRecent_ValueChanged(object sender, EventArgs e)
-        {
-            Settings.RecentFilesCount = (int)nudRecent.Value;
-        }
 
         private void tsUserStatistics_Toggled(object sender, EventArgs e)
         {
@@ -255,7 +328,7 @@ namespace Analogy
         private void chklItems_SelectedIndexChanged(object sender, EventArgs e)
         {
             Settings.StartupExtensions =
-                chklItems.CheckedItems.Cast<IAnalogyExtension>().Select(ex => ex.ExtensionID).ToList();
+                chklItems.CheckedItems.Cast<IAnalogyExtension>().Select(ex => ex.ID).ToList();
 
 
         }
@@ -486,5 +559,86 @@ namespace Analogy
                 lboxAlerts.Refresh();
             }
         }
+
+        private void sbtnFolderProbingBrowse_Click(object sender, EventArgs e)
+        {
+            using (FolderBrowserDialog folderDlg = new FolderBrowserDialog
+            {
+                ShowNewFolderButton = false
+            })
+            {
+                // Show the FolderBrowserDialog.  
+                DialogResult result = folderDlg.ShowDialog();
+                if (result == DialogResult.OK)
+                {
+                    teFoldersProbing.Text = folderDlg.SelectedPath;
+                }
+            }
+        }
+
+        private void sbtnFolderProbingAdd_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrEmpty(teFoldersProbing.Text)) return;
+            listBoxFoldersProbing.Items.Add(teFoldersProbing.Text);
+        }
+
+        private void sbtnDeleteFolderProbing_Click(object sender, EventArgs e)
+        {
+            if (listBoxFoldersProbing.SelectedItem != null)
+                listBoxFoldersProbing.Items.Remove(listBoxFoldersProbing.SelectedItem);
+        }
+
+        private void rbtnDarkIconColor_CheckedChanged(object sender, EventArgs e)
+        {
+            if (rbtnDarkIconColor.Checked)
+            {
+                peAnalogy.Image = Resources.AnalogyDark;
+            }
+        }
+
+        private void rbtnLightIconColor_CheckedChanged(object sender, EventArgs e)
+        {
+            if (rbtnLightIconColor.Checked)
+            {
+                peAnalogy.Image = Resources.AnalogyLight;
+            }
+        }
+
+        private void sbtnHeaderSet_Click(object sender, EventArgs e)
+        {
+            if (!string.IsNullOrEmpty(teHeader.Text) && teHeader.Tag is DevExpress.XtraGrid.Columns.GridColumn column)
+            {
+                column.Caption = teHeader.Text;
+                SaveGridLayout();
+            }
+        }
+        private void SaveGridLayout()
+        {
+            try
+            {
+                gridControl.MainView.SaveLayoutToXml(Settings.LogGridFileName);
+            }
+            catch (Exception e)
+            {
+                AnalogyLogger.Instance.LogException(e, "Analogy", $"Error saving setting: {e.Message}");
+                XtraMessageBox.Show(e.Message, $"Error Saving layout file: {e.Message}", MessageBoxButtons.OK, MessageBoxIcon.Error);
+
+            }
+        }
+
+        private void sbtnDateTimeFormat_Click(object sender, EventArgs e)
+        {
+
+            logGrid.Columns["Date"].DisplayFormat.FormatType = FormatType.DateTime;
+            logGrid.Columns["Date"].DisplayFormat.FormatString = teDateTimeFormat.Text;
+            Settings.DateTimePattern = teDateTimeFormat.Text;
+        }
+
+        private void ceNewMessagesColor_CheckedChanged(object sender, EventArgs e)
+        {
+            cpeNewMessagesColor.Enabled = ceNewMessagesColor.Checked;
+
+        }
     }
 }
+

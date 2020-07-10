@@ -63,7 +63,7 @@
       <Value Profile="(Default)">False</Value>
     </Setting>
     <Setting Name="FontSize" Type="System.Single" Scope="User">
-      <Value Profile="(Default)">10.5</Value>
+      <Value Profile="(Default)">8.5</Value>
     </Setting>
     <Setting Name="IncludeText" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
@@ -87,7 +87,7 @@
       <Value Profile="(Default)" />
     </Setting>
     <Setting Name="AutoScrollToLastMessage" Type="System.Boolean" Scope="User">
-      <Value Profile="(Default)">True</Value>
+      <Value Profile="(Default)">False</Value>
     </Setting>
     <Setting Name="LogParsersSettings" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
@@ -96,7 +96,7 @@
       <Value Profile="(Default)" />
     </Setting>
     <Setting Name="DefaultDescendOrder" Type="System.Boolean" Scope="User">
-      <Value Profile="(Default)">False</Value>
+      <Value Profile="(Default)">True</Value>
     </Setting>
     <Setting Name="FactoriesOrder" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
@@ -123,6 +123,42 @@
       <Value Profile="(Default)" />
     </Setting>
     <Setting Name="LastSearchesExclude" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="AdditionalProbingLocations" Type="System.String" Scope="User">
+      <Value Profile="(Default)">[]</Value>
+    </Setting>
+    <Setting Name="SingleInstance" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
+    <Setting Name="AnalogyIcon" Type="System.String" Scope="User">
+      <Value Profile="(Default)">Dark</Value>
+    </Setting>
+    <Setting Name="DateTimePattern" Type="System.String" Scope="User">
+      <Value Profile="(Default)">yyyy.MM.dd HH:mm:ss.ff</Value>
+    </Setting>
+    <Setting Name="LastUpdate" Type="System.DateTime" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="UpdateMode" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">1</Value>
+    </Setting>
+    <Setting Name="LastVersionChecked" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="MinimizedToTrayBar" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
+    <Setting Name="RecentFoldersCount" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">10</Value>
+    </Setting>
+    <Setting Name="RecentFolders" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="CheckAdditionalInformation" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
+    </Setting>
+    <Setting Name="AnalogyPosition" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>
   </Settings>

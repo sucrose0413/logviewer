@@ -8,7 +8,7 @@ namespace Analogy
 {
     public partial class ExtensionsUC : UserControl
     {
-        public event EventHandler<EventArgs> OnClick;
+        public event EventHandler<EventArgs> OnClicked;
         public ExtensionsUC()
         {
             InitializeComponent();
@@ -31,9 +31,9 @@ namespace Analogy
         {
             IAnalogyExtension analogyExtension = (IAnalogyExtension)chklItems.SelectedItem;
             if (analogyExtension == null) return;
-            lblExtension.Text = $"Name: {analogyExtension.DisplayName}";
+            lblExtension.Text = $"Name: {analogyExtension.Title}";
             lblDescription.Text = $"Description: {analogyExtension.Description}";
-            lblType.Text = $"Type: {analogyExtension.AnalogyExtensionType}";
+            lblType.Text = $"Type: {analogyExtension.ExtensionType}";
             lblAuthor.Text = $"Author: {analogyExtension.Author} (Mail: {analogyExtension.AuthorMail})";
         }
 
@@ -57,7 +57,7 @@ namespace Analogy
                 sBtnLoad.Text = "Loaded";
             }
 
-            OnClick?.Invoke(this, new EventArgs());
+            OnClicked?.Invoke(this, new EventArgs());
         }
     }
 }

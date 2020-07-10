@@ -1,8 +1,8 @@
-﻿using DevExpress.XtraEditors;
+﻿using Analogy.Interfaces;
+using DevExpress.XtraEditors;
 using System;
 using System.Collections.Generic;
 using System.Windows.Forms;
-using Analogy.Interfaces;
 
 namespace Analogy
 {
@@ -15,7 +15,7 @@ namespace Analogy
 
         public FormMessageDetails(AnalogyLogMessage msg, List<AnalogyLogMessage> messages, string dataSource) : this()
         {
-            UCMessageDetails uc = new UCMessageDetails(msg, messages, dataSource);
+            MessageDetailsUC uc = new MessageDetailsUC(msg, messages, dataSource);
             spltCMain.Panel1.Controls.Add(uc);
             uc.Dock = DockStyle.Fill;
         }
@@ -23,6 +23,11 @@ namespace Analogy
         private void btnClose_Click(object sender, EventArgs e)
         {
             Close();
+        }
+
+        private void FormMessageDetails_Load(object sender, EventArgs e)
+        {
+            Icon = UserSettingsManager.UserSettings.GetIcon();
         }
     }
 }

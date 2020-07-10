@@ -1,16 +1,17 @@
+using Analogy.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Xml;
-using Analogy.Interfaces;
 
 namespace Analogy
 {
     public class FileProcessor
     {
+        public event EventHandler<EventArgs> OnFileReadingFinished;
+        public DateTime lastNewestMessage;
         private UserSettingsManager Settings => UserSettingsManager.UserSettings;
         private string FileName { get; set; }
         public Stream DataStream { get; set; }
@@ -25,11 +26,11 @@ namespace Analogy
 
         }
 
-        public async Task<IEnumerable<AnalogyLogMessage>> Process(IAnalogyOfflineDataProvider fileDataProvider, string filename, CancellationToken token)
+        public async Task<IEnumerable<AnalogyLogMessage>> Process(IAnalogyOfflineDataProvider fileDataProvider, string filename, CancellationToken token, bool isReload = false)
         {
             FileName = filename;
             if (string.IsNullOrEmpty(FileName)) return new List<AnalogyLogMessage>();
-            if (!DataWindow.ForceNoFileCaching && FileProcessingManager.Instance.AlreadyProcessed(FileName) && Settings.EnableFileCaching) //get it from the cache
+            if (!isReload && !DataWindow.ForceNoFileCaching && FileProcessingManager.Instance.AlreadyProcessed(FileName) && Settings.EnableFileCaching) //get it from the cache
             {
                 var cachedMessages = FileProcessingManager.Instance.GetMessages(FileName);
                 DataWindow.AppendMessages(cachedMessages, Utils.GetFileNameAsDataSource(FileName));
@@ -62,17 +63,20 @@ namespace Analogy
                     Settings.AddToRecentFiles(fileDataProvider.ID, FileName);
                 var messages = (await fileDataProvider.Process(filename, token, DataWindow).ConfigureAwait(false)).ToList();
                 FileProcessingManager.Instance.DoneProcessingFile(messages.ToList(), FileName);
+                if (messages.Any())
+                    lastNewestMessage = messages.Select(m => m.Date).Max();
+                OnFileReadingFinished?.Invoke(this, EventArgs.Empty);
                 if (LogWindow != null)
                     Interlocked.Decrement(ref LogWindow.fileLoadingCount);
                 return messages;
             }
             catch (Exception e)
             {
-                AnalogyLogger.Intance.LogCritical("Analogy", $"Error parsing file: {e}");
+                AnalogyLogger.Instance.LogCritical("Analogy", $"Error parsing file: {e}");
                 AnalogyLogMessage error = new AnalogyLogMessage($"Error reading file {filename}: Error: {e.Message}", AnalogyLogLevel.Error, AnalogyLogClass.General, "Analogy", "None");
                 error.Source = nameof(FileProcessor);
                 error.Module = "Analogy";
-                DataWindow.AppendMessage(error,fileDataProvider.GetType().FullName);
+                DataWindow.AppendMessage(error, fileDataProvider.GetType().FullName);
                 return new List<AnalogyLogMessage> { error };
             }
         }

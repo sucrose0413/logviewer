@@ -1,4 +1,8 @@
-﻿using DevExpress.Data;
+﻿using Analogy.DataSources;
+using Analogy.Interfaces;
+using Analogy.Types;
+using DevExpress.Data;
+using DevExpress.Data.Filtering;
 using DevExpress.LookAndFeel;
 using DevExpress.Utils;
 using DevExpress.XtraBars;
@@ -17,50 +21,49 @@ using System.Drawing.Imaging;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using Analogy.DataSources;
-using Analogy.Interfaces;
-using Analogy.Types;
-using DevExpress.Data.Filtering;
 
 namespace Analogy
 {
 
-    public partial class UCLogs : XtraUserControl, ILogMessageCreatedHandler
+    public partial class UCLogs : XtraUserControl, ILogMessageCreatedHandler, ILogWindow
     {
-        private bool simClear;
         public bool ForceNoFileCaching { get; set; } = false;
         public bool DoNotAddToRecentHistory { get; set; } = false;
         private PagingManager PagingManager { get; set; }
         private FileProcessor fileProcessor { get; set; }
-
-        CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
+        ManualResetEvent columnAdderSync = new ManualResetEvent(false);
+        public List<string> CurrentColumns { get; set; }
+        public CancellationTokenSource CancellationTokenSource { get; set; } = new CancellationTokenSource();
+        public event EventHandler<bool> FullMode;
         public event EventHandler<AnalogyClearedHistoryEventArgs> OnHistoryCleared;
         public event EventHandler<(string, AnalogyLogMessage)> OnFocusedRowChanged;
         private Dictionary<string, List<AnalogyLogMessage>> groupingByChars;
         private string OldTextInclude = string.Empty;
         private string OldTextExclude = string.Empty;
         public int fileLoadingCount;
+        private bool FullModeEnabled { get; set; }
         private bool LoadingInProgress => fileLoadingCount > 0;
         private UserSettingsManager Settings => UserSettingsManager.UserSettings;
         private IExtensionsManager ExtensionManager { get; set; } = ExtensionsManager.Instance;
         private IEnumerable<IAnalogyExtension> InPlaceRegisteredExtensions { get; set; }
         private List<IAnalogyExtension> UserControlRegisteredExtensions { get; set; }
         private List<int> HighlightRows { get; set; } = new List<int>();
-        private ToolTip Tip { get; set; }
         private List<string> _excludeMostCommon = new List<string>();
         public const string DataGridDateColumnName = "Date";
         private bool _realtimeUpdate = true;
 
-        private ReaderWriterLockSlim lockExternalWindowsObject = new ReaderWriterLockSlim(LockRecursionPolicy.NoRecursion);
+        private ReaderWriterLockSlim lockExternalWindowsObject =
+            new ReaderWriterLockSlim(LockRecursionPolicy.NoRecursion);
+
         private ReaderWriterLockSlim lockSlim;
         private DataTable _messageData;
         private DataTable _bookmarkedMessages;
         private IProgress<AnalogyProgressReport> ProgressReporter { get; set; }
         private readonly List<XtraFormLogGrid> _externalWindows = new List<XtraFormLogGrid>();
+
         private List<XtraFormLogGrid> ExternalWindows
         {
             get
@@ -73,62 +76,136 @@ namespace Analogy
         }
 
         private int ExternalWindowsCount;
-        private List<AnalogyLogMessage> Messages
+
+        public List<AnalogyLogMessage> Messages
         {
             get
             {
                 var filterDatatable = GetFilteredDataTable();
-                return filterDatatable.Rows.OfType<DataRow>().Select(r => (AnalogyLogMessage)r["Object"]).ToList();
+                return filterDatatable.Rows.OfType<DataRow>().Select(r => (AnalogyLogMessage) r["Object"]).ToList();
             }
         }
+
         private List<AnalogyLogMessage> BookmarkedMessages
         {
-            get { return _bookmarkedMessages.Rows.OfType<DataRow>().Select(r => (AnalogyLogMessage)r["Object"]).ToList(); }
+            get
+            {
+                return _bookmarkedMessages.Rows.OfType<DataRow>().Select(r => (AnalogyLogMessage) r["Object"]).ToList();
+            }
         }
 
-        private bool EnableOTA { get; } = false;//GeneralUtils.UseDebugMode("AnalogyOTA");
+        private bool EnableOTA { get; } = false; //GeneralUtils.UseDebugMode("AnalogyOTA");
         private AnalogyLogMessage _currentMassage;
         private FilterCriteriaObject _filterCriteria = new FilterCriteriaObject();
         private AutoCompleteStringCollection autoCompleteInclude = new AutoCompleteStringCollection();
         private AutoCompleteStringCollection autoCompleteExclude = new AutoCompleteStringCollection();
-        public bool OnlineMode { get; set; }
 
-        // private bool FilterHasChanged { get; set; }
+        private List<string> LoadedFiles { get; set; }
         private bool NewDataExist { get; set; }
+        private DateTime reloadDateTime = DateTime.MaxValue;
         private bool hasAnyInPlaceExtensions;
         private bool hasAnyUserControlExtensions;
         private DateTime diffStartTime = DateTime.MinValue;
-        private string LayoutFileName;
         private bool BookmarkView;
         private int pageNumber = 1;
         private CancellationTokenSource filterTokenSource;
         private CancellationToken filterToken;
 
         private int TotalPages => PagingManager.TotalPages;
-        private IAnalogyOfflineDataProvider FileDataProvider { get; set; }
+        public IAnalogyDataProvider DataProvider { get; set; }
+        public IAnalogyOfflineDataProvider FileDataProvider { get; set; }
         private IAnalogyOfflineDataProvider AnalogyOfflineDataProvider { get; } = new AnalogyOfflineDataProvider();
+
         public GridView LogGrid
         {
             get => logGrid;
             set => logGrid = value;
         }
+
         public UCLogs()
         {
             InitializeComponent();
-
+            logGrid.OptionsSelection.MultiSelect = true;
+            logGrid.OptionsSelection.MultiSelectMode = GridMultiSelectMode.RowSelect;
+            var logLevelValues = Enum.GetValues(typeof(AnalogyLogLevel));
             filterTokenSource = new CancellationTokenSource();
             filterToken = filterTokenSource.Token;
             fileProcessor = new FileProcessor(this);
             if (DesignMode) return;
-            LayoutFileName = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? string.Empty, "layout.xml");
             PagingManager = new PagingManager(this);
             lockSlim = PagingManager.lockSlim;
             _messageData = PagingManager.CurrentPage();
+            CurrentColumns = logGrid.Columns.Select(c => c.FieldName).ToList();
+            deNewerThanFilter.DateTime = DateTime.Now;
+            deOlderThanFilter.DateTime = DateTime.Now;
             SetupEventsHandlers();
         }
 
         private void SetupEventsHandlers()
         {
+            deNewerThanFilter.EditValueChanged += async (s, e) =>
+            {
+                ceNewerThanFilter.Checked = true;
+                await FilterHasChanged();
+            };
+            deNewerThanFilter.Properties.EditValueChanged += async (s, e) =>
+            {
+                ceNewerThanFilter.Checked = true;
+                await FilterHasChanged();
+            };
+
+            deOlderThanFilter.EditValueChanged += async (s, e) =>
+            {
+                ceOlderThanFilter.Checked = true;
+                await FilterHasChanged();
+            };
+
+            deOlderThanFilter.Properties.EditValueChanged += async (s, e) =>
+            {
+                ceOlderThanFilter.Checked = true;
+                await FilterHasChanged();
+            };
+
+            ceOlderThanFilter.CheckedChanged += async (s, e) => await FilterHasChanged();
+            ceNewerThanFilter.CheckedChanged += async (s, e) => await FilterHasChanged();
+            ceModulesProcess.Click += async (s, e) => await FilterHasChanged();
+            ceSources.Click += async (s, e) => await FilterHasChanged();
+            ceIncludeText.CheckedChanged += async (s, e) =>
+            {
+                if (!ceIncludeText.Checked && !ceExcludeText.Checked)
+                {
+                    LogGrid.ClearColumnsFilter();
+                    gridColumnText.FilterInfo = null;
+                }
+
+                await FilterHasChanged();
+            };
+            ceExcludeText.CheckedChanged += async (s, e) =>
+            {
+                if (!ceIncludeText.Checked && !ceExcludeText.Checked)
+                {
+                    LogGrid.ClearColumnsFilter();
+                    gridColumnText.FilterInfo = null;
+                }
+
+                await FilterHasChanged();
+            };
+            logGrid.EndSorting += (s, e) =>
+            {
+                var sortOrder = gridColumnDate.SortOrder;
+                Settings.DefaultDescendOrder = sortOrder == ColumnSortOrder.Descending;
+            };
+            bBtnFullGrid.ItemClick += (s, e) =>
+            {
+                FullModeEnabled = !FullModeEnabled;
+                FullMode?.Invoke(this, FullModeEnabled);
+                spltMain.Collapsed = FullModeEnabled;
+            };
+            bBtnShare.ItemClick += (s, e) =>
+            {
+                AnalogyOTAForm share = new AnalogyOTAForm(GetFilteredDataTable());
+                share.Show(this);
+            };
             PagingManager.OnPageChanged += (s, arg) =>
             {
                 if (IsDisposed) return;
@@ -162,12 +239,12 @@ namespace Analogy
                 // txtbHighlight.Text = txtbInclude.Text;
                 if (string.IsNullOrEmpty(txtbInclude.Text))
                 {
-                    chkbIncludeText.Checked = false;
+                    ceIncludeText.Checked = false;
                     return;
                 }
 
                 chkbHighlight.Checked = false;
-                chkbIncludeText.Checked = true;
+                ceIncludeText.Checked = true;
                 await FilterHasChanged();
             };
 
@@ -193,11 +270,11 @@ namespace Analogy
                 OldTextExclude = txtbExclude.Text;
                 if (string.IsNullOrEmpty(txtbExclude.Text))
                 {
-                    chkExclude.Checked = false;
+                    ceExcludeText.Checked = false;
                     return;
                 }
 
-                chkExclude.Checked = true;
+                ceExcludeText.Checked = true;
                 await FilterHasChanged();
             };
 
@@ -205,46 +282,76 @@ namespace Analogy
             {
                 if (string.IsNullOrEmpty(txtbSource.Text))
                 {
-                    chkbSources.Checked = false;
+                    ceSources.Checked = false;
                 }
                 else
                 {
-                    if (!chkbSources.Checked)
-                        chkbSources.Checked = true;
+                    if (!ceSources.Checked)
+                        ceSources.Checked = true;
                 }
 
                 await FilterHasChanged();
-                Settings.SourceText = chkbSources.Text;
+                Settings.SourceText = txtbSource.Text;
             };
 
             txtbModule.TextChanged += async (s, e) =>
             {
                 if (string.IsNullOrEmpty(txtbModule.Text))
                 {
-                    chkbModules.Checked = false;
+                    ceModulesProcess.Checked = false;
                 }
                 else
                 {
-                    if (!chkbModules.Checked)
-                        chkbModules.Checked = true;
+                    if (!ceModulesProcess.Checked)
+                        ceModulesProcess.Checked = true;
                 }
 
                 await FilterHasChanged();
-                Settings.ModuleText = chkbModules.Text;
+                Settings.ModuleText = txtbModule.Text;
+            };
+
+            bbtnReload.ItemClick += async (s, e) =>
+            {
+                reloadDateTime = fileProcessor.lastNewestMessage;
+                await LoadFilesAsync(LoadedFiles, true, true);
             };
         }
+
+
+        private void LoadReplacementHeaders()
+        {
+            try
+            {
+                if (DataProvider.GetReplacementHeaders() == null || !DataProvider.GetReplacementHeaders().Any())
+                    return;
+                foreach ((string originalHeader, string replacementHeader) in DataProvider.GetReplacementHeaders())
+                {
+                    logGrid.Columns[originalHeader].Caption = replacementHeader;
+                }
+
+            }
+            catch (Exception)
+            {
+                //ignore replacement
+            }
+        }
+
+        public void SetFileDataSource(IAnalogyDataProvider dataProvider, IAnalogyOfflineDataProvider fileDataProvider)
+        {
+            DataProvider = dataProvider;
+            FileDataProvider = fileDataProvider;
+            SetSaveButtonsVisibility(FileDataProvider != null);
+        }
+
         private void UCLogs_Load(object sender, EventArgs e)
         {
             if (DesignMode) return;
-
+            //LogWindowsContainer.Instance.Register(this);
             LoadUISettings();
+            LoadReplacementHeaders();
             BookmarkModeUI();
+            LoadExtensions();
 
-            hasAnyInPlaceExtensions = ExtensionManager.HasAnyInPlace;
-            hasAnyUserControlExtensions = ExtensionManager.HasAnyInPlace;
-            InPlaceRegisteredExtensions = ExtensionManager.InPlaceRegisteredExtensions.ToList();
-            UserControlRegisteredExtensions = ExtensionManager.UserControlRegisteredExtensions.ToList();
-            InitializeExtensionsColumns();
             ProgressReporter = new Progress<AnalogyProgressReport>((value) =>
             {
                 progressBar1.Maximum = value.Total;
@@ -267,6 +374,7 @@ namespace Analogy
                 }
             };
 
+
             gridControl.DataSource = _messageData.DefaultView;
             _bookmarkedMessages = Utils.DataTableConstructor();
             gridControlBookmarkedMessages.DataSource = _bookmarkedMessages;
@@ -274,19 +382,22 @@ namespace Analogy
             gridControl.Focus();
         }
 
-        public void SetFileDataSource(IAnalogyOfflineDataProvider fileDataProvider)
+        public void SetSaveButtonsVisibility(bool on)
         {
-            FileDataProvider = fileDataProvider;
-            if (FileDataProvider is EventLogDataProvider eventDataSource)
-                eventDataSource.LogWindow = this;
-            if (FileDataProvider == null)
+            if (on)
             {
                 //disable specific saving
+                bBtnSaveLog.Visibility = BarItemVisibility.Always;
+                bBtnSaveEntireLog.Visibility = BarItemVisibility.Always;
+                bBtnSaveCurrentSelectionCustomFormat.Visibility = BarItemVisibility.Always;
+            }
+            else
+            {
                 bBtnSaveLog.Visibility = BarItemVisibility.Never;
                 bBtnSaveEntireLog.Visibility = BarItemVisibility.Never;
+                bBtnSaveCurrentSelectionCustomFormat.Visibility = BarItemVisibility.Never;
             }
         }
-
 
         public void ProcessCmdKeyFromParent(Keys keyData)
         {
@@ -295,6 +406,7 @@ namespace Analogy
             {
                 txtbInclude.Focus();
             }
+
             if (e.Shift && e.KeyCode == Keys.F)
 
             {
@@ -307,6 +419,7 @@ namespace Analogy
                     ? CheckState.Unchecked
                     : CheckState.Checked;
             }
+
             if (e.Alt && e.KeyCode == Keys.W)
             {
                 chkLstLogLevel.Items[2].CheckState = (chkLstLogLevel.Items[2].CheckState == CheckState.Checked)
@@ -322,12 +435,14 @@ namespace Analogy
             {
                 btswitchExpand.Checked = !btswitchExpand.Checked;
             }
+
             if (e.Control && e.KeyCode == Keys.F)
 
             {
                 txtbInclude.Focus();
                 return true;
             }
+
             if (e.Shift && e.KeyCode == Keys.F)
 
             {
@@ -342,6 +457,7 @@ namespace Analogy
                     : CheckState.Checked;
                 return true;
             }
+
             if (e.Alt && e.KeyCode == Keys.W)
             {
                 chkLstLogLevel.Items[2].CheckState = (chkLstLogLevel.Items[2].CheckState == CheckState.Checked)
@@ -349,16 +465,15 @@ namespace Analogy
                     : CheckState.Checked;
                 return true;
             }
+
             return base.ProcessCmdKey(ref msg, keyData);
 
         }
 
         private void LoadUISettings()
         {
-            Tip = new ToolTip();
-            Tip.SetToolTip(pboxInfo, "Use & or + for AND operations. Use | for OR operations");
-            Tip.SetToolTip(pboxInfoExclude, "Use , to separate values. to exclude source or module prefix it with -");
-
+            gridColumnDate.SortOrder =
+                Settings.DefaultDescendOrder ? ColumnSortOrder.Descending : ColumnSortOrder.Ascending;
             spltFilteringBoth.SplitterDistance = spltFilteringBoth.Width - 150;
             pnlFilteringLeft.Dock = DockStyle.Fill;
             txtbInclude.MaskBox.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
@@ -368,6 +483,7 @@ namespace Analogy
                 autoCompleteInclude.AddRange(Settings.LastSearchesInclude.ToArray());
                 autoCompleteExclude.AddRange(Settings.LastSearchesExclude.ToArray());
             }
+
             txtbInclude.MaskBox.AutoCompleteCustomSource = autoCompleteInclude;
 
             txtbExclude.MaskBox.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
@@ -375,11 +491,12 @@ namespace Analogy
             txtbExclude.MaskBox.AutoCompleteCustomSource = autoCompleteExclude;
 
             gridControl.ForceInitialize();
-            if (File.Exists(LayoutFileName))
+            if (File.Exists(Settings.LogGridFileName))
             {
-                gridControl.MainView.RestoreLayoutFromXml(LayoutFileName);
-                gridControlBookmarkedMessages.MainView.RestoreLayoutFromXml(LayoutFileName);
+                gridControl.MainView.RestoreLayoutFromXml(Settings.LogGridFileName);
+                gridControlBookmarkedMessages.MainView.RestoreLayoutFromXml(Settings.LogGridFileName);
             }
+
             if (Settings.SaveSearchFilters)
             {
                 txtbInclude.Text = Settings.IncludeText;
@@ -387,6 +504,7 @@ namespace Analogy
                 txtbSource.Text = Settings.SourceText;
                 txtbModule.Text = Settings.ModuleText;
             }
+
             btswitchRefreshLog.Checked = true;
             gridColumnCategory.Visible = false;
             LogGrid.BestFitColumns();
@@ -396,6 +514,17 @@ namespace Analogy
                 chkLstLogLevel.Items[1].CheckState = CheckState.Checked;
             LogGrid.Appearance.Row.Font = new Font(LogGrid.Appearance.Row.Font.Name, Settings.FontSize);
             btsAutoScrollToBottom.Checked = Settings.AutoScrollToLastMessage;
+
+            logGrid.Columns["Date"].DisplayFormat.FormatType = FormatType.DateTime;
+            logGrid.Columns["Date"].DisplayFormat.FormatString = Settings.DateTimePattern;
+
+            gridViewBookmarkedMessages.Columns["Date"].DisplayFormat.FormatType = FormatType.DateTime;
+            gridViewBookmarkedMessages.Columns["Date"].DisplayFormat.FormatString = Settings.DateTimePattern;
+
+            gridViewGrouping2.Columns["Date"].DisplayFormat.FormatType = FormatType.DateTime;
+            gridViewGrouping2.Columns["Date"].DisplayFormat.FormatString = Settings.DateTimePattern;
+
+
         }
 
         private void BookmarkModeUI()
@@ -408,8 +537,16 @@ namespace Analogy
             }
         }
 
-        private void InitializeExtensionsColumns()
+        public void LoadExtensions()
         {
+            var extensions = ExtensionManager.RegisteredExtensions.Where(e => e.TargetProviderId == DataProvider.ID)
+                .ToList();
+            hasAnyInPlaceExtensions = extensions.Any(e => e.ExtensionType == AnalogyExtensionType.InPlace);
+            hasAnyUserControlExtensions = extensions.Any(e => e.ExtensionType == AnalogyExtensionType.UserControl);
+            InPlaceRegisteredExtensions =
+                extensions.Where(e => e.ExtensionType == AnalogyExtensionType.InPlace).ToList();
+            UserControlRegisteredExtensions =
+                extensions.Where(e => e.ExtensionType == AnalogyExtensionType.UserControl).ToList();
             foreach (IAnalogyExtension extension in InPlaceRegisteredExtensions)
             {
                 var columns = extension.GetColumnsInfo();
@@ -427,14 +564,12 @@ namespace Analogy
             }
         }
 
-
-
         private void UCLogs_DragEnter(object sender, DragEventArgs e) =>
             e.Effect = e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None;
 
         private async void UCLogs_DragDrop(object sender, DragEventArgs e)
         {
-            string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
+            string[] files = (string[]) e.Data.GetData(DataFormats.FileDrop);
             await LoadFilesAsync(files.ToList(), false);
 
         }
@@ -453,7 +588,7 @@ namespace Analogy
             if (selRows == null || selRows.Length != 1) return;
 
             int rownum = selRows.First();
-            _currentMassage = (AnalogyLogMessage)LogGrid.GetRowCellValue(rownum, "Object");
+            _currentMassage = (AnalogyLogMessage) LogGrid.GetRowCellValue(rownum, "Object");
             LoadTextBoxes(_currentMassage);
             if (hasAnyInPlaceExtensions)
             {
@@ -486,7 +621,7 @@ namespace Analogy
         {
 
 
-            (AnalogyLogMessage message, _) = GetMessageFromSelectedRowInGrid();
+            (AnalogyLogMessage message, _) = GetMessageFromSelectedFocusedRowInGrid();
             if (message == null) return;
             LoadTextBoxes(message);
 
@@ -494,7 +629,7 @@ namespace Analogy
 
         private void LogGrid_KeyPress(object sender, KeyPressEventArgs e)
         {
-            if (e.KeyChar == (char)13)
+            if (e.KeyChar == (char) 13)
             {
                 OpenMessageDetails();
             }
@@ -504,44 +639,68 @@ namespace Analogy
         {
             if (sender is GridView view && e.RowHandle >= 0)
             {
-                string level = view.GetRowCellDisplayText(e.RowHandle, view.Columns["Level"]);
-                var parsed = Enum.TryParse(level, true, out AnalogyLogLevel enumLevel);
-                if (parsed)
+                IAnalogyLogMessage message =
+                    (AnalogyLogMessage) view.GetRowCellValue(e.RowHandle, view.Columns["Object"]);
+                if (message == null) return;
+                if (!Settings.ColorSettings.OverrideLogLevelColor && Settings.ColorSettings.EnableNewMessagesColor &&
+                    message.Date > reloadDateTime)
                 {
-                    e.Appearance.BackColor = Settings.ColorSettings.GetColorForLogLevel(enumLevel);
-                    switch (enumLevel)
-                    {
-                        case AnalogyLogLevel.Warning:
-                        case AnalogyLogLevel.Error:
-                        case AnalogyLogLevel.Critical:
-                            if (UserLookAndFeel.Default.ActiveLookAndFeel.ActiveSkinName.Contains("Dark"))
-                                e.Appearance.ForeColor = Color.Black;
-                            break;
-                        case AnalogyLogLevel.Event:
-                        case AnalogyLogLevel.Verbose:
-                        case AnalogyLogLevel.Debug:
-                        case AnalogyLogLevel.Disabled:
-                        case AnalogyLogLevel.Trace:
-                        case AnalogyLogLevel.Unknown:
-                        case AnalogyLogLevel.AnalogyInformation:
-                            break;
-                        default:
-                            throw new ArgumentOutOfRangeException();
-                    }
+                    e.Appearance.BackColor = Settings.ColorSettings.NewMessagesColor;
+                }
+
+                e.Appearance.BackColor = Settings.ColorSettings.GetColorForLogLevel(message.Level);
+                switch (message.Level)
+                {
+                    case AnalogyLogLevel.Warning:
+                    case AnalogyLogLevel.Error:
+                    case AnalogyLogLevel.Critical:
+                        if (UserLookAndFeel.Default.ActiveLookAndFeel.ActiveSkinName.Contains("Dark"))
+                            e.Appearance.ForeColor = Color.Black;
+                        break;
+                    case AnalogyLogLevel.Event:
+                    case AnalogyLogLevel.Verbose:
+                    case AnalogyLogLevel.Debug:
+                    case AnalogyLogLevel.Disabled:
+                    case AnalogyLogLevel.Trace:
+                    case AnalogyLogLevel.Unknown:
+                    case AnalogyLogLevel.AnalogyInformation:
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+
+                if (Settings.ColorSettings.OverrideLogLevelColor && Settings.ColorSettings.EnableNewMessagesColor &&
+                    message.Date > reloadDateTime)
+                {
+                    e.Appearance.BackColor = Settings.ColorSettings.NewMessagesColor;
                 }
 
                 string text = view.GetRowCellDisplayText(e.RowHandle, view.Columns["Text"]);
-                if (chkbHighlight.Checked && FilterCriteriaObject.Match(text, txtbHighlight.Text, PreDefinedQueryType.Contains))
+                if (chkbHighlight.Checked &&
+                    FilterCriteriaObject.Match(text, txtbHighlight.Text, PreDefinedQueryType.Contains))
                 {
                     e.Appearance.BackColor = Settings.ColorSettings.GetHighlightColor();
                 }
 
                 foreach (PreDefineHighlight preDefineHighlight in Settings.PreDefinedQueries.Highlights)
                 {
-                    if (FilterCriteriaObject.Match(text, preDefineHighlight.Text, preDefineHighlight.PreDefinedQueryType))
+                    if (FilterCriteriaObject.Match(text, preDefineHighlight.Text,
+                        preDefineHighlight.PreDefinedQueryType))
                     {
                         e.Appearance.BackColor = preDefineHighlight.Color;
                     }
+                }
+
+                if (DataProvider.UseCustomColors)
+                {
+                    IAnalogyLogMessage m =
+                        (AnalogyLogMessage) view.GetRowCellValue(e.RowHandle, view.Columns["Object"]);
+                    if (m == null) return;
+                    var colors = DataProvider.GetColorForMessage(m);
+                    if (colors.backgroundColor != Color.Empty)
+                        e.Appearance.BackColor = colors.backgroundColor;
+                    if (colors.foregroundColor != Color.Empty)
+                        e.Appearance.ForeColor = colors.foregroundColor;
                 }
             }
         }
@@ -549,7 +708,7 @@ namespace Analogy
         private void pmsGridView_CustomDrawRowIndicator(object sender, RowIndicatorCustomDrawEventArgs e)
         {
             if (!(e.RowHandle >= 0) || !e.Info.IsRowIndicator || !(sender is GridView view)) return;
-            AnalogyLogMessage msg = (AnalogyLogMessage)view.GetRowCellValue(e.RowHandle, "Object");
+            AnalogyLogMessage msg = (AnalogyLogMessage) view.GetRowCellValue(e.RowHandle, "Object");
             if (msg == null) return;
             Image img = imageList.Images[7];
             switch (msg.Level)
@@ -592,7 +751,7 @@ namespace Analogy
 
         private void tsmiCopy_Click(object sender, EventArgs e)
         {
-            (AnalogyLogMessage m, _) = GetMessageFromSelectedRowInGrid();
+            (AnalogyLogMessage m, _) = GetMessageFromSelectedFocusedRowInGrid();
             if (m != null)
                 Clipboard.SetText(m.Text);
         }
@@ -600,7 +759,7 @@ namespace Analogy
         private void tsmiEmail_Click(object sender, EventArgs e)
         {
 
-            (AnalogyLogMessage message, _) = GetMessageFromSelectedRowInGrid();
+            (AnalogyLogMessage message, _) = GetMessageFromSelectedFocusedRowInGrid();
             if (message == null) return;
             try
             {
@@ -631,41 +790,22 @@ namespace Analogy
             filterToken = filterTokenSource.Token;
             await RefreshData(filterToken);
         }
+
         private async void tsmiExclude_Click(object sender, EventArgs e)
         {
-            (AnalogyLogMessage message, _) = GetMessageFromSelectedRowInGrid();
+            (AnalogyLogMessage message, _) = GetMessageFromSelectedFocusedRowInGrid();
             if (message == null) return;
             var ef = new AnalogyExcludeMessage(message);
             if (ef.ShowDialog(this) == DialogResult.OK)
             {
                 string exclude = ef.Exclude;
                 txtbExclude.Text = txtbExclude.Text + "|" + exclude;
-                chkExclude.Checked = true;
+                ceExcludeText.Checked = true;
                 await FilterHasChanged();
             }
         }
 
-        private async void chkbInclude_CheckedChanged(object sender, EventArgs e)
-        {
-            if (!chkbIncludeText.Checked && !chkExclude.Checked)
-            {
-                LogGrid.ClearColumnsFilter();
-                gridColumnText.FilterInfo = null;
-            }
 
-            await FilterHasChanged();
-        }
-
-        private async void chkbExclude_CheckedChanged(object sender, EventArgs e)
-        {
-            if (!chkbIncludeText.Checked && !chkExclude.Checked)
-            {
-                LogGrid.ClearColumnsFilter();
-                gridColumnText.FilterInfo = null;
-            }
-
-            await FilterHasChanged();
-        }
 
         /// <summary>
         /// Set custom column display text
@@ -750,8 +890,9 @@ namespace Analogy
                 {
                     CriteriaOperator op = LogGrid.ActiveFilterCriteria; //filterControl1.FilterCriteria  
                     string filterString = CriteriaToWhereClauseHelper.GetDataSetWhere(op);
-                    filter = $"{filter} and {filterString}";
+                    filter = string.IsNullOrEmpty(filter) ? filterString : $"{filter} and {filterString}";
                 }
+
                 //todo
                 //todo:replace for performance
                 //var rows = _messageData.Select(filter);
@@ -766,6 +907,8 @@ namespace Analogy
             }
         }
 
+        public List<AnalogyLogMessage> GetMessages() => PagingManager.GetAllMessages();
+
         private (int total, int error, int warning, int critical, int alerts) GetRowsCount()
         {
 
@@ -779,7 +922,7 @@ namespace Analogy
                 {
                     CriteriaOperator op = LogGrid.ActiveFilterCriteria; //filterControl1.FilterCriteria  
                     string filterString = CriteriaToWhereClauseHelper.GetDataSetWhere(op);
-                    filter = $"{filter} and {filterString}";
+                    filter = string.IsNullOrEmpty(filter) ? filterString : $"{filter} and {filterString}";
                 }
 
                 var rows = _messageData.Select(filter);
@@ -787,22 +930,23 @@ namespace Analogy
                 var error = rows.Count(r => r["Level"].ToString() == AnalogyLogLevel.Error.ToString());
                 var warning = rows.Count(r => r["Level"].ToString() == AnalogyLogLevel.Warning.ToString());
                 var critical = rows.Count(r => r["Level"].ToString() == AnalogyLogLevel.Critical.ToString());
-                var AlertCount = 0;
+                var alertCount = 0;
                 if (Settings.PreDefinedQueries.Alerts.Any())
                 {
-                    var messages = rows.Select(r => (AnalogyLogMessage)r["Object"]).ToList();
-                    AlertCount = messages.Count(m =>
+                    var messages = rows.Select(r => (AnalogyLogMessage) r["Object"]).ToList();
+                    alertCount = messages.Count(m =>
                         Settings.PreDefinedQueries.Alerts.Any(a => FilterCriteriaObject.MatchAlert(m, a)));
 
                 }
 
-                return (total, error, warning, critical, AlertCount);
+                return (total, error, warning, critical, alertCount);
             }
             finally
             {
                 lockSlim.ExitReadLock();
             }
         }
+
         private string GetFilterDisplayText(DateRangeFilter filterType)
         {
             string displayText = string.Empty;
@@ -903,7 +1047,7 @@ namespace Analogy
             {
                 PagingManager.IncrementTotalMissedMessages();
             }
-            lockSlim.EnterWriteLock();
+
             if (ExternalWindowsCount > 0)
             {
                 foreach (XtraFormLogGrid grid in ExternalWindows)
@@ -914,11 +1058,20 @@ namespace Analogy
 
 
             DataRow dtr = PagingManager.AppendMessage(message, dataSource);
+            lockSlim.EnterWriteLock();
             if (diffStartTime > DateTime.MinValue)
             {
                 dtr["TimeDiff"] = message.Date.Subtract(diffStartTime).ToString();
             }
 
+            lockSlim.ExitWriteLock();
+            if (message.AdditionalInformation != null && message.AdditionalInformation.Any() &&
+                Settings.CheckAdditionalInformation)
+            {
+                AddExtraColumnsToLogGrid(logGrid, message);
+            }
+
+            lockSlim.EnterWriteLock();
             if (hasAnyInPlaceExtensions)
             {
                 foreach (IAnalogyExtension extension in InPlaceRegisteredExtensions)
@@ -938,9 +1091,43 @@ namespace Analogy
                     extension.NewMessage(message);
                 }
             }
+
             lockSlim.ExitWriteLock();
             if (PagingManager.IsCurrentPageInView(_messageData))
                 NewDataExist = true;
+        }
+
+        private void AddExtraColumnsToLogGrid(GridView gridView, AnalogyLogMessage message)
+        {
+            if (message.AdditionalInformation != null && message.AdditionalInformation.Any() &&
+                Settings.CheckAdditionalInformation)
+                foreach (KeyValuePair<string, string> info in message.AdditionalInformation)
+                {
+                    if (!CurrentColumns.Contains(info.Key))
+                    {
+                        if (this.InvokeRequired)
+                        {
+                            BeginInvoke(new MethodInvoker(() =>
+                            {
+                                if (!gridView.Columns.Select(g => g.FieldName).Contains(info.Key))
+                                    gridView.Columns.Add(new GridColumn()
+                                        {Caption = info.Key, FieldName = info.Key, Name = info.Key, Visible = true});
+                                CurrentColumns.Add(info.Key);
+                                columnAdderSync.Set();
+                            }));
+                            columnAdderSync.WaitOne();
+                            columnAdderSync.Reset();
+                        }
+                        else
+                        {
+                            if (!gridView.Columns.Select(g => g.FieldName).Contains(info.Key))
+                                gridView.Columns.Add(new GridColumn()
+                                    {Caption = info.Key, FieldName = info.Key, Name = info.Key, Visible = true});
+                            CurrentColumns.Add(info.Key);
+                        }
+
+                    }
+                }
         }
 
         public void AppendMessages(List<AnalogyLogMessage> messages, string dataSource)
@@ -950,7 +1137,8 @@ namespace Analogy
             {
                 PagingManager.IncrementTotalMissedMessages();
             }
-            lockSlim.EnterWriteLock();
+
+            //lockSlim.EnterWriteLock();
             if (ExternalWindowsCount > 0)
             {
                 foreach (XtraFormLogGrid grid in ExternalWindows)
@@ -978,9 +1166,16 @@ namespace Analogy
                     }
                 }
 
+                if (message.AdditionalInformation != null && message.AdditionalInformation.Any() &&
+                    Settings.CheckAdditionalInformation)
+                {
+                    AddExtraColumnsToLogGrid(logGrid, message);
+                }
+
                 dtr.EndEdit();
             }
-            lockSlim.ExitWriteLock();
+
+            //lockSlim.ExitWriteLock();
             if (PagingManager.IsCurrentPageInView(_messageData))
                 NewDataExist = true;
 
@@ -1054,10 +1249,12 @@ namespace Analogy
                 autoCompleteExclude.Add(exclude);
             Settings.AddNewSearchesEntryToLists(include, true);
             Settings.AddNewSearchesEntryToLists(exclude, false);
-            _filterCriteria.NewerThan = chkDateNewerThan.Checked ? deNewerThanFilter.DateTime : DateTime.MinValue;
-            _filterCriteria.OlderThan = chkDateOlderThan.Checked ? deOlderThanFilter.DateTime : DateTime.MaxValue;
-            _filterCriteria.TextInclude = chkbIncludeText.Checked ? txtbInclude.Text : string.Empty;
-            _filterCriteria.TextExclude = chkExclude.Checked ? txtbExclude.Text + "|" + string.Join("|", _excludeMostCommon) : string.Empty;
+            _filterCriteria.NewerThan = ceNewerThanFilter.Checked ? deNewerThanFilter.DateTime : DateTime.MinValue;
+            _filterCriteria.OlderThan = ceOlderThanFilter.Checked ? deOlderThanFilter.DateTime : DateTime.MaxValue;
+            _filterCriteria.TextInclude = ceIncludeText.Checked ? txtbInclude.Text : string.Empty;
+            _filterCriteria.TextExclude = ceExcludeText.Checked
+                ? txtbExclude.Text + "|" + string.Join("|", _excludeMostCommon)
+                : string.Empty;
 
 
             Settings.IncludeText = Settings.SaveSearchFilters ? _filterCriteria.TextInclude : string.Empty;
@@ -1066,21 +1263,28 @@ namespace Analogy
 
             _filterCriteria.Levels = null;
             if (chkLstLogLevel.Items[0].CheckState == CheckState.Checked)
-                _filterCriteria.Levels = new[] { AnalogyLogLevel.Trace, AnalogyLogLevel.Disabled, AnalogyLogLevel.Unknown };
+                _filterCriteria.Levels = new[]
+                    {AnalogyLogLevel.Trace, AnalogyLogLevel.Disabled, AnalogyLogLevel.Unknown};
             if (chkLstLogLevel.Items[1].CheckState == CheckState.Checked)
-                _filterCriteria.Levels = new[] { AnalogyLogLevel.Error, AnalogyLogLevel.Critical, AnalogyLogLevel.Disabled, AnalogyLogLevel.Unknown };
+                _filterCriteria.Levels = new[]
+                {
+                    AnalogyLogLevel.Error, AnalogyLogLevel.Critical, AnalogyLogLevel.Disabled, AnalogyLogLevel.Unknown
+                };
             else if (chkLstLogLevel.Items[2].CheckState == CheckState.Checked)
-                _filterCriteria.Levels = new[] { AnalogyLogLevel.Warning, AnalogyLogLevel.Disabled, AnalogyLogLevel.Unknown };
+                _filterCriteria.Levels = new[]
+                    {AnalogyLogLevel.Warning, AnalogyLogLevel.Disabled, AnalogyLogLevel.Unknown};
             else if (chkLstLogLevel.Items[3].CheckState == CheckState.Checked)
-                _filterCriteria.Levels = new[] { AnalogyLogLevel.Debug, AnalogyLogLevel.Disabled, AnalogyLogLevel.Unknown };
+                _filterCriteria.Levels = new[]
+                    {AnalogyLogLevel.Debug, AnalogyLogLevel.Disabled, AnalogyLogLevel.Unknown};
             else if (chkLstLogLevel.Items[4].CheckState == CheckState.Checked)
-                _filterCriteria.Levels = new[] { AnalogyLogLevel.Verbose, AnalogyLogLevel.Disabled, AnalogyLogLevel.Unknown };
+                _filterCriteria.Levels = new[]
+                    {AnalogyLogLevel.Verbose, AnalogyLogLevel.Disabled, AnalogyLogLevel.Unknown};
 
 
 
-            if (chkbSources.Checked && !string.IsNullOrEmpty(txtbSource.Text))
+            if (ceSources.Checked && !string.IsNullOrEmpty(txtbSource.Text))
             {
-                var items = txtbSource.Text.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                var items = txtbSource.Text.Split(new[] {','}, StringSplitOptions.RemoveEmptyEntries);
                 var includeItems = items.Where(i => !i.StartsWith("-"));
                 var excludeItems = items.Where(i => i.StartsWith("-") && i.Length > 1)
                     .Select(i => i.Substring(1, i.Length - 1));
@@ -1096,13 +1300,13 @@ namespace Analogy
 
             Settings.SourceText = Settings.SaveSearchFilters ? txtbSource.Text : string.Empty;
 
-            if (chkbModules.Checked && !string.IsNullOrEmpty(txtbModule.Text))
+            if (ceModulesProcess.Checked && !string.IsNullOrEmpty(txtbModule.Text))
             {
 
-                var items = txtbModule.Text.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                var items = txtbModule.Text.Split(new[] {','}, StringSplitOptions.RemoveEmptyEntries);
                 var includeItems = items.Where(i => !i.StartsWith("-"));
                 var excludeItems = items.Where(i => i.StartsWith("-") && i.Length > 1)
-                      .Select(i => i.Substring(1, i.Length - 1));
+                    .Select(i => i.Substring(1, i.Length - 1));
 
                 _filterCriteria.Modules = includeItems.Select(val => val.Trim()).ToArray();
                 _filterCriteria.ExcludedModules = excludeItems.Select(val => val.Trim()).ToArray();
@@ -1114,6 +1318,7 @@ namespace Analogy
                 _filterCriteria.Modules = null;
                 _filterCriteria.ExcludedModules = null;
             }
+
             Settings.ModuleText = Settings.SaveSearchFilters ? txtbModule.Text : string.Empty;
             string filter = _filterCriteria.GetSqlExpression();
             lockSlim.EnterWriteLock();
@@ -1149,6 +1354,7 @@ namespace Analogy
 
 
         }
+
         public virtual int LocateByValue(int startRowHandle, GridColumn column, AnalogyLogMessage val)
         {
             if (!LogGrid.DataController.IsReady || val == null)
@@ -1159,11 +1365,14 @@ namespace Analogy
                 if (startRowHandle != 0)
                     throw new ArgumentException("Argument must be '0' in server mode.", nameof(startRowHandle));
             }
+
             try
             {
                 if (LogGrid.IsServerMode)
                     return LogGrid.DataController.FindRowByValue(column.FieldName, val, null);
-                for (int rowHandle = startRowHandle; rowHandle < LogGrid.DataController.VisibleListSourceRowCount; ++rowHandle)
+                for (int rowHandle = startRowHandle;
+                    rowHandle < LogGrid.DataController.VisibleListSourceRowCount;
+                    ++rowHandle)
                 {
                     object rowCellValue = LogGrid.GetRowCellValue(rowHandle, column.Caption);
                     if (Equals(val, rowCellValue))
@@ -1173,15 +1382,18 @@ namespace Analogy
             catch
             {
             }
+
             return int.MinValue;
         }
+
         private void RefreshUIMessagesCount()
         {
             if (!IsHandleCreated) return;
             BeginInvoke(new MethodInvoker(() =>
             {
                 var result = GetRowsCount();
-                lblTotalMessages.Text = $"Total messages:{result.total}. Errors:{result.error}. Warnings:{result.warning}. Criticals:{result.critical}.";
+                lblTotalMessages.Text =
+                    $"Total messages:{result.total}. Errors:{result.error}. Warnings:{result.warning}. Criticals:{result.critical}.";
                 if (result.alerts > 0)
                 {
                     lblTotalMessagesAlert.Text = $" ALERTS EXISTS: {result.alerts}!";
@@ -1195,26 +1407,13 @@ namespace Analogy
             }));
         }
 
-        public void RefreshUI()
+        public async Task LoadFilesAsync(List<string> fileNames, bool clearLogBeforeLoading,
+            bool IsReloadSoForceNoCaching = false)
         {
-            //gridColumnDataSource.VisibleIndex = 0;
-            //gridColumnDate.VisibleIndex = 1;
-            //gridColumnText.VisibleIndex = 2;
-            //gridColumnSource.VisibleIndex = 3;
-            //gridColumnLevel.VisibleIndex = 4;
-            //gridColumnClass.VisibleIndex = 5;
-            //gridColumnModule.VisibleIndex = 6;
-            //gridColumnProcessID.VisibleIndex = 7;
-            //gridColumnUser.VisibleIndex = 8;
-            //gridColumnCategory.VisibleIndex = 9;
-            //gridColumnAudit.VisibleIndex = 10;
-
-        }
-
-        public async Task LoadFilesAsync(List<string> fileNames, bool clearLogBeforeLoading)
-        {
-            cancellationTokenSource = new CancellationTokenSource();
-            CancellationToken token = cancellationTokenSource.Token;
+            LoadedFiles = fileNames;
+            bbtnReload.Visibility = BarItemVisibility.Always;
+            CancellationTokenSource = new CancellationTokenSource();
+            CancellationToken token = CancellationTokenSource.Token;
             if (clearLogBeforeLoading)
                 ClearLogs(false);
             sBtnCancel.Visible = true;
@@ -1228,13 +1427,14 @@ namespace Analogy
             {
                 if (!File.Exists(filename))
                 {
-                    AnalogyLogMessage m = new AnalogyLogMessage($"File {filename} does not exist", AnalogyLogLevel.Critical, AnalogyLogClass.General, "Analogy", "None");
+                    AnalogyLogMessage m = new AnalogyLogMessage($"File {filename} does not exist",
+                        AnalogyLogLevel.Critical, AnalogyLogClass.General, "Analogy", "None");
                     AppendMessage(m, "Analogy");
                     continue;
                 }
 
                 Text = @"File: " + filename;
-                await fileProcessor.Process(FileDataProvider, filename, cancellationTokenSource.Token);
+                await fileProcessor.Process(FileDataProvider, filename, token, IsReloadSoForceNoCaching);
                 processed++;
                 ProgressReporter.Report(new AnalogyProgressReport("Processed", processed, fileNames.Count, filename));
                 if (token.IsCancellationRequested)
@@ -1294,21 +1494,6 @@ namespace Analogy
             }
         }
 
-        private void tsBtnShare_Click(object sender, EventArgs e)
-        {
-            if (EnableOTA)
-            {
-                AnalogyOTAClient client = new AnalogyOTAClient(GetFilteredDataTable());
-                client.Show(this);
-            }
-            else
-            {
-                XtraMessageBox.Show("Sharing logs feature has been disabled", "Operation Is Not allowed",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
-        }
-
-
         private void tmrNewData_Tick(object sender, EventArgs e)
         {
             if (NewDataExist)
@@ -1316,34 +1501,6 @@ namespace Analogy
                 NewDataExist = false;
                 AcceptChanges(false);
             }
-
-        }
-
-        private void txtbInclude_MouseEnter(object sender, EventArgs e)
-        {
-            txtbInclude.Focus();
-            txtbInclude.SelectAll();
-        }
-
-        private void txtbInclude_Enter(object sender, EventArgs e)
-        {
-            txtbInclude.SelectAll();
-        }
-
-        private void txtbExcludeSource_TextChanged(object sender, EventArgs e)
-        {
-            //if (string.IsNullOrEmpty(txtbExcludeSource.Text))
-            //{
-            //    chkbExcludeSources.Checked = false;
-            //}
-            //else
-            //{
-            //    if (!chkbExcludeSources.Checked)
-            //        chkbExcludeSources.Checked = true;
-            //}
-
-            //RefreshUserFilter();
-            //Settings.ExcludedSource = txtbExcludeSource.Text;
 
         }
 
@@ -1366,7 +1523,7 @@ namespace Analogy
 
         private void OpenMessageDetails()
         {
-            (AnalogyLogMessage message, string dataSource) = GetMessageFromSelectedRowInGrid();
+            (AnalogyLogMessage message, string dataSource) = GetMessageFromSelectedFocusedRowInGrid();
             if (message == null) return;
             FormMessageDetails details = new FormMessageDetails(message, Messages, dataSource);
             details.Show(this);
@@ -1380,24 +1537,14 @@ namespace Analogy
         private void CreateBookmark(bool persists)
         {
 
-            (AnalogyLogMessage message, _) = GetMessageFromSelectedRowInGrid();
+            (AnalogyLogMessage message, _) = GetMessageFromSelectedFocusedRowInGrid();
             int[] selRows = LogGrid.GetSelectedRows();
             if (message == null) return;
             lockSlim.EnterWriteLock();
-
-            DataRow dtr = _bookmarkedMessages.NewRow();
-            dtr["Date"] = message.Date;
-            dtr["Text"] = message.Text ?? "";
-            dtr["Source"] = message.Source ?? "";
-            dtr["Level"] = message.Level.ToString();
-            dtr["Class"] = message.Class.ToString();
-            dtr["Category"] = message.Category ?? "";
-            dtr["User"] = message.User ?? "";
-            dtr["Module"] = message.Module ?? "";
-            dtr["Object"] = message;
-            dtr["ProcessID"] = message.ProcessID;
-            string dataSource = (string)LogGrid.GetRowCellValue(selRows.First(), "DataProvider");
-            dtr["DataProvider"] = dataSource;
+            string dataSource = (string) LogGrid.GetRowCellValue(selRows.First(), "DataProvider") ?? string.Empty;
+            AddExtraColumnsIfNeededToTable(_bookmarkedMessages, gridViewBookmarkedMessages, message);
+            DataRow dtr = Utils.CreateRow(_bookmarkedMessages, message, dataSource,
+                Settings.CheckAdditionalInformation);
             if (diffStartTime > DateTime.MinValue)
             {
                 dtr["TimeDiff"] = message.Date.Subtract(diffStartTime).ToString();
@@ -1413,12 +1560,50 @@ namespace Analogy
             lockSlim.ExitWriteLock();
         }
 
+        private void AddExtraColumnsIfNeededToTable(DataTable table, GridView view, AnalogyLogMessage message)
+        {
+            if (message.AdditionalInformation != null && message.AdditionalInformation.Any() &&
+                Settings.CheckAdditionalInformation)
+            {
+                foreach (KeyValuePair<string, string> info in message.AdditionalInformation)
+                {
+                    if (!table.Columns.Contains(info.Key))
+                    {
+
+                        if (!InvokeRequired)
+                        {
+                            if (!view.Columns.Select(g => g.FieldName).Contains(info.Key))
+                                view.Columns.Add(new GridColumn()
+                                    {Caption = info.Key, FieldName = info.Key, Name = info.Key, Visible = true});
+                            table.Columns.Add(info.Key);
+                        }
+                        else
+                        {
+                            BeginInvoke(new MethodInvoker(() =>
+                            {
+                                if (!view.Columns.Select(g => g.FieldName).Contains(info.Key))
+                                    view.Columns.Add(new GridColumn()
+                                        {Caption = info.Key, FieldName = info.Key, Name = info.Key, Visible = true});
+                                table.Columns.Add(info.Key);
+                                columnAdderSync.Set();
+                            }));
+                            columnAdderSync.WaitOne();
+                            columnAdderSync.Reset();
+
+                        }
+                    }
+                }
+            }
+
+
+        }
+
         private void GoToMessage()
         {
             int[] selRows = gridViewBookmarkedMessages.GetSelectedRows();
             if (selRows == null || selRows.Length != 1) return;
             int rownum = selRows.First();
-            var currentRow = (DataRowView)gridViewBookmarkedMessages.GetRow(rownum);
+            var currentRow = (DataRowView) gridViewBookmarkedMessages.GetRow(rownum);
             try
             {
                 var LogMessage = currentRow["Object"] as AnalogyLogMessage;
@@ -1454,14 +1639,14 @@ namespace Analogy
         private void tsmiExcludeSource_Click(object sender, EventArgs e)
         {
 
-            (AnalogyLogMessage message, _) = GetMessageFromSelectedRowInGrid();
+            (AnalogyLogMessage message, _) = GetMessageFromSelectedFocusedRowInGrid();
             if (!string.IsNullOrEmpty(message?.Source))
                 txtbSource.Text = txtbSource.Text + ",-" + message.Source;
         }
 
         private void tsmiExcludeModule_Click(object sender, EventArgs e)
         {
-            (AnalogyLogMessage message, _) = GetMessageFromSelectedRowInGrid();
+            (AnalogyLogMessage message, _) = GetMessageFromSelectedFocusedRowInGrid();
             if (!string.IsNullOrEmpty(message?.Module))
                 txtbModule.Text = txtbModule.Text + ",-" + message.Module;
         }
@@ -1478,7 +1663,7 @@ namespace Analogy
 
         private void tsmiTimeDiff_Click(object sender, EventArgs e)
         {
-            (AnalogyLogMessage message, _) = GetMessageFromSelectedRowInGrid();
+            (AnalogyLogMessage message, _) = GetMessageFromSelectedFocusedRowInGrid();
             if (message != null)
             {
                 diffStartTime = message.Date;
@@ -1495,7 +1680,7 @@ namespace Analogy
             _messageData.BeginLoadData();
             foreach (DataRow row in _messageData.Rows)
             {
-                AnalogyLogMessage message = (AnalogyLogMessage)row["Object"];
+                AnalogyLogMessage message = (AnalogyLogMessage) row["Object"];
                 //row["TimeDiff"] = message.Date.Subtract(diffStartTime).ToString("d\\.hh\\:mm\\:ss\\.fff");
                 row["TimeDiff"] = message.Date.Subtract(diffStartTime).ToString();
             }
@@ -1505,6 +1690,7 @@ namespace Analogy
             gridControl.RefreshDataSource();
             lockSlim.ExitWriteLock();
         }
+
         private void btnUp_Click(object sender, EventArgs e)
         {
             if (HighlightRows.Any() && LogGrid.GetSelectedRows().Any())
@@ -1563,14 +1749,18 @@ namespace Analogy
                     }
                     catch (Exception e)
                     {
-                        XtraMessageBox.Show(e.Message, @"Error Saving file", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        XtraMessageBox.Show(e.Message, @"Error Saving file", MessageBoxButtons.OK,
+                            MessageBoxIcon.Error);
                     }
 
                 }
             }
             else
             {
-                if (XtraMessageBox.Show("Current Data Source does not support Save Operation" + Environment.NewLine + "Do you want to Save in Analogy XML Format?", @"Save not Supported", MessageBoxButtons.YesNo, MessageBoxIcon.Error) == DialogResult.Yes)
+                if (XtraMessageBox.Show(
+                    "Current Data Source does not support Save Operation" + Environment.NewLine +
+                    "Do you want to Save in Analogy XML Format?", @"Save not Supported", MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Error) == DialogResult.Yes)
                 {
                     SaveMessagesToLog(AnalogyOfflineDataProvider, messages);
                     //SaveFileDialog saveFileDialog = new SaveFileDialog();
@@ -1592,24 +1782,26 @@ namespace Analogy
                 }
                 else
                 {
-                    XtraMessageBox.Show("Operation Aborted", @"Save file", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    XtraMessageBox.Show("Operation Aborted", @"Save file", MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
                 }
             }
 
         }
+
         private async void bBtnImport_ItemClick(object sender, ItemClickEventArgs e)
         {
 
             OpenFileDialog openFileDialog1 = new OpenFileDialog();
             openFileDialog1.Filter =
-                "Plain XML log file (*.log)|*.log|JSON file (*.json)|*.json|NLOG file (*.nlog)|*.nlog|Zipped XML log file (*.zip)|*.zip|ETW log file (*.etl)|*.etl";
+                "Plain XML log file (*.xml)|*.xml|JSON file (*.json)|*.json|NLOG file (*.nlog)|*.nlog|Zipped XML log file (*.zip)|*.zip|ETW log file (*.etl)|*.etl";
             openFileDialog1.Title = @"Import file to current view";
             openFileDialog1.Multiselect = false;
             if (openFileDialog1.ShowDialog() == DialogResult.OK)
             {
                 try
                 {
-                    await LoadFilesAsync(new List<string> { openFileDialog1.FileName }, false);
+                    await LoadFilesAsync(new List<string> {openFileDialog1.FileName}, false);
                 }
                 catch (Exception exception)
                 {
@@ -1637,7 +1829,7 @@ namespace Analogy
             if (ef.ShowDialog(this) == DialogResult.OK)
             {
                 _excludeMostCommon = AnalogyExclude.GlobalExclusion;
-                chkExclude.Checked = true;
+                ceExcludeText.Checked = true;
                 await FilterHasChanged();
             }
         }
@@ -1655,7 +1847,6 @@ namespace Analogy
 
         private void sBtnLength_Click(object sender, EventArgs e)
         {
-            nudGroupBychars.Value = Math.Max(txtbGroupByCharsLimit.Text.Length, nudGroupBychars.Value);
             ApplyGrouping();
         }
 
@@ -1667,13 +1858,28 @@ namespace Analogy
 
         private void ApplyGrouping()
         {
-            List<IGrouping<string, AnalogyLogMessage>> grouped = Messages
-                .GroupBy(s => s.Text.Substring(0, Math.Min(s.Text.Length, (int)nudGroupBychars.Value)))
-                .OrderByDescending(i => i.Count()).ToList();
-            groupingByChars = grouped.ToDictionary(g => g.Key, g => g.ToList());
-            gCtrlGrouping.DataSource = groupingByChars.Keys;
+            if (rbGroupByTextLength.Checked)
+            {
+                gCtrlGrouping.DataSource = null;
+                List<IGrouping<string, AnalogyLogMessage>> grouped = Messages
+                    .GroupBy(s => s.Text.Substring(0, Math.Min(s.Text.Length, (int) nudGroupBychars.Value)))
+                    .OrderByDescending(i => i.Count()).ToList();
+                groupingByChars = grouped.ToDictionary(g => g.Key, g => g.ToList());
+                gCtrlGrouping.DataSource = groupingByChars.Keys;
+            }
+            else // group by text
+            {
+                gCtrlGrouping.DataSource = null;
+                List<IGrouping<string, AnalogyLogMessage>> grouped = Messages.Where(m=>m.Text.Contains(txtbGroupByChars.Text,StringComparison.CurrentCultureIgnoreCase))
+                    .GroupBy(s => s.Text)
+                    .OrderByDescending(i => i.Count()).ToList();
+                groupingByChars = grouped.ToDictionary(g => g.Key, g => g.ToList());
+                gCtrlGrouping.DataSource = groupingByChars.Keys;
+            }
         }
-        private void bBtnCopyButtom_ItemClick(object sender, ItemClickEventArgs e)
+    
+
+    private void bBtnCopyButtom_ItemClick(object sender, ItemClickEventArgs e)
         {
             Clipboard.SetText(rtxtContent.Text);
         }
@@ -1719,12 +1925,13 @@ namespace Analogy
         {
             try
             {
-                gridControl.MainView.SaveLayoutToXml(LayoutFileName);
+                gridControl.MainView.SaveLayoutToXml(Settings.LogGridFileName);
             }
-            catch (Exception exception)
+            catch (Exception e)
             {
-                Console.WriteLine(exception);
-                throw;
+                AnalogyLogger.Instance.LogException(e, "Analogy", $"Error saving setting: {e.Message}");
+                XtraMessageBox.Show(e.Message, $"Error Saving layout file: {e.Message}", MessageBoxButtons.OK, MessageBoxIcon.Error);
+
             }
         }
         private void tsmiBookmarkPersist_Click(object sender, EventArgs e)
@@ -1744,7 +1951,7 @@ namespace Analogy
 
         private void RemoveBookmark()
         {
-            (AnalogyLogMessage message, _) = GetMessageFromSelectedRowInGrid();
+            (AnalogyLogMessage message, _) = GetMessageFromSelectedFocusedRowInGrid();
             if (message != null)
                 BookmarkPersistManager.Instance.RemoveBookmark(message);
 
@@ -1753,7 +1960,7 @@ namespace Analogy
         //{
         //    if (e.Column.FieldName == "gridColumnLevelImage")
         //    {
-        //        string severity = logGrid.GetListSourceRowCellValue(e.ListSourceRowIndex, gridView1.Columns["Level"])
+        //        string severity = logGrid.GetListSourceRowCellValue(e.ListSourceRowIndex, gridViewGrouping2.Columns["Level"])
         //            .ToString();
         //        LogLevel level = Utils.GetLogLevel(severity);
         //        switch (level)
@@ -1799,7 +2006,7 @@ namespace Analogy
 
         private void cmsMessageOperation_Opening(object sender, System.ComponentModel.CancelEventArgs e)
         {
-            (AnalogyLogMessage message, _) = GetMessageFromSelectedRowInGrid();
+            (AnalogyLogMessage message, _) = GetMessageFromSelectedFocusedRowInGrid();
             if (message != null)
             {
                 tsmiExcludeModule.Text = $"Exclude Process: {message.Module}";
@@ -1817,20 +2024,37 @@ namespace Analogy
             }
         }
 
-        private (AnalogyLogMessage, string) GetMessageFromSelectedRowInGrid()
+        private (AnalogyLogMessage message, string dataProvider) GetMessageFromSelectedFocusedRowInGrid()
         {
-            int[] selRows = LogGrid.GetSelectedRows();
-            if (selRows == null || !selRows.Any()) return (null, string.Empty);
-            var row = selRows.First();
-            string datasource = (string)LogGrid.GetRowCellValue(row, "DataProvider");
-            AnalogyLogMessage message = (AnalogyLogMessage)LogGrid.GetRowCellValue(selRows.First(), "Object");
-            return (message, datasource);
+            var row = LogGrid.GetFocusedRow();
+            if (row == null) return (null, string.Empty);
+            string dataSource = (string)LogGrid.GetFocusedRowCellValue("DataProvider");
+            AnalogyLogMessage message = (AnalogyLogMessage)LogGrid.GetFocusedRowCellValue("Object");
+            return (message, dataSource);
 
         }
+        private List<AnalogyLogMessage> GetMessagesFromSelectedRowInGrid(out string dataProvider)
+        {
+            dataProvider = string.Empty;
+            var selectedRowHandles = logGrid.GetSelectedRows();
+            List<AnalogyLogMessage> messages = new List<AnalogyLogMessage>();
+            for (int i = 0; i < selectedRowHandles.Length; i++)
+            {
 
+                if (selectedRowHandles[i] >= 0)
+                {
+                    dataProvider = (string)LogGrid.GetRowCellValue(selectedRowHandles[i], "DataProvider");
+                    AnalogyLogMessage message = (AnalogyLogMessage)LogGrid.GetRowCellValue(selectedRowHandles[i], "Object");
+                    messages.Add(message);
+                }
+            }
+
+            return messages;
+
+        }
         private void cmsBookmarked_Opening(object sender, System.ComponentModel.CancelEventArgs e)
         {
-            (AnalogyLogMessage message, _) = GetMessageFromSelectedRowInGrid();
+            (AnalogyLogMessage message, _) = GetMessageFromSelectedFocusedRowInGrid();
             if (message != null)
             {
                 tsmiExcludeModuleBookmark.Text = $"Exclude Process: {message.Module}";
@@ -1851,26 +2075,15 @@ namespace Analogy
 
         private void gridViewGrouping_FocusedRowChanged(object sender, FocusedRowChangedEventArgs e)
         {
+            if (e.FocusedRowHandle < 0) return;
             var grouped = Utils.DataTableConstructor();
             string key =
                 (string)gridViewGrouping.GetRowCellValue(e.FocusedRowHandle, gridViewGrouping.Columns.First());
             var messages = groupingByChars[key];
             foreach (var message in messages)
             {
-
-                DataRow dtr = grouped.NewRow();
-
-                dtr["Date"] = message.Date;
-                dtr["Text"] = message.Text ?? "";
-                dtr["Source"] = message.Source ?? "";
-                dtr["Level"] = message.Level;
-                dtr["Class"] = message.Class;
-                dtr["Category"] = message.Category ?? "";
-                dtr["User"] = message.User ?? "";
-                dtr["Module"] = message.Module ?? "";
-                dtr["Object"] = message;
-                dtr["ProcessID"] = message.ProcessID;
-                dtr["DataProvider"] = "";
+                AddExtraColumnsIfNeededToTable(grouped,gridViewGrouping2,message);
+                DataRow dtr = Utils.CreateRow(grouped, message, "", Settings.CheckAdditionalInformation);
                 if (diffStartTime > DateTime.MinValue)
                 {
                     dtr["TimeDiff"] = message.Date.Subtract(diffStartTime).ToString();
@@ -1886,10 +2099,10 @@ namespace Analogy
 
         private void sBtnCancel_Click(object sender, EventArgs e)
         {
-            cancellationTokenSource.Cancel(false);
+            CancellationTokenSource.Cancel(false);
             Interlocked.Exchange(ref fileLoadingCount, 0);
 
-            cancellationTokenSource = new CancellationTokenSource();
+            CancellationTokenSource = new CancellationTokenSource();
             sBtnCancel.Visible = false;
         }
 
@@ -2026,7 +2239,7 @@ namespace Analogy
             if (!msg.Any()) return;
             var source = GetFilteredDataTable().Rows[0]?["DataProvider"]?.ToString();
             if (source == null) return;
-            XtraFormLogGrid grid = new XtraFormLogGrid(msg, source);
+            XtraFormLogGrid grid = new XtraFormLogGrid(msg, source, DataProvider, FileDataProvider);
             lockExternalWindowsObject.EnterWriteLock();
             _externalWindows.Add(grid);
             Interlocked.Increment(ref ExternalWindowsCount);
@@ -2086,7 +2299,7 @@ namespace Analogy
 
         private void tsmiREmoveAllPreviousMessages_Click(object sender, EventArgs e)
         {
-            (AnalogyLogMessage current, _) = GetMessageFromSelectedRowInGrid();
+            (AnalogyLogMessage current, _) = GetMessageFromSelectedFocusedRowInGrid();
             if (current == null) return;
 
             lockSlim.EnterWriteLock();
@@ -2165,7 +2378,7 @@ namespace Analogy
             var processes = msg.Select(m => m.Module).Distinct().ToList();
             foreach (string process in processes)
             {
-                XtraFormLogGrid grid = new XtraFormLogGrid(msg, source, process);
+                XtraFormLogGrid grid = new XtraFormLogGrid(msg, source, DataProvider, FileDataProvider, process);
                 lockExternalWindowsObject.EnterWriteLock();
                 _externalWindows.Add(grid);
                 Interlocked.Increment(ref ExternalWindowsCount);
@@ -2196,86 +2409,42 @@ namespace Analogy
             txtbSource.Text = "";
         }
 
-        private async void txtbIncludeSource_TextChanged(object sender, EventArgs e)
-        {
-
-        }
-
-
         private void sbtnIncludeModules_Click(object sender, EventArgs e)
         {
             txtbModule.Text = "";
         }
-
-        private async void txtbIncludeModule_TextChanged(object sender, EventArgs e)
-        {
-
-        }
-
         private void sbtnUndockPerProcess_Click(object sender, EventArgs e)
         {
             UndockViewPerProcess();
         }
 
-        private async void deNewerThanFilter_EditValueChanged(object sender, EventArgs e)
-        {
-            chkDateNewerThan.Checked = true;
-            await FilterHasChanged();
-        }
-        private async void deNewerThanFilter_Properties_EditValueChanged(object sender, EventArgs e)
-        {
-            chkDateNewerThan.Checked = true;
-            await FilterHasChanged();
-        }
-
-        private async void deOlderThanFilter_EditValueChanged(object sender, EventArgs e)
-        {
-            chkDateOlderThan.Checked = true;
-            await FilterHasChanged();
-        }
-
-        private async void deOlderThanFilter_Properties_EditValueChanged(object sender, EventArgs e)
-        {
-            chkDateOlderThan.Checked = true;
-            await FilterHasChanged();
-        }
-
-        private async void chkDateOlderThan_CheckedChanged(object sender, EventArgs e)
-        {
-            await FilterHasChanged();
-        }
-
-        private async void chkDateNewerThan_CheckedChanged(object sender, EventArgs e)
-        {
-            await FilterHasChanged();
-        }
 
         private void tsmiDateFilterNewer_Click(object sender, EventArgs e)
         {
-            (AnalogyLogMessage message, _) = GetMessageFromSelectedRowInGrid();
+            (AnalogyLogMessage message, _) = GetMessageFromSelectedFocusedRowInGrid();
             deNewerThanFilter.DateTime = message.Date;
-            chkDateNewerThan.Checked = true;
+            ceNewerThanFilter.Checked = true;
         }
 
         private void tsmiDateFilterOlder_Click(object sender, EventArgs e)
         {
-            (AnalogyLogMessage message, _) = GetMessageFromSelectedRowInGrid();
+            (AnalogyLogMessage message, _) = GetMessageFromSelectedFocusedRowInGrid();
             deOlderThanFilter.DateTime = message.Date;
-            chkDateOlderThan.Checked = true;
+            ceOlderThanFilter.Checked = true;
         }
 
         private void tsmiBookmarkDateFilterNewer_Click(object sender, EventArgs e)
         {
-            (AnalogyLogMessage message, _) = GetMessageFromSelectedRowInGrid();
+            (AnalogyLogMessage message, _) = GetMessageFromSelectedFocusedRowInGrid();
             deNewerThanFilter.DateTime = message.Date;
-            chkDateNewerThan.Checked = true;
+            ceNewerThanFilter.Checked = true;
         }
 
         private void tsmiBookmarkDateFilterOlder_Click(object sender, EventArgs e)
         {
-            (AnalogyLogMessage message, _) = GetMessageFromSelectedRowInGrid();
+            (AnalogyLogMessage message, _) = GetMessageFromSelectedFocusedRowInGrid();
             deOlderThanFilter.DateTime = message.Date;
-            chkDateOlderThan.Checked = true;
+            ceOlderThanFilter.Checked = true;
         }
 
         private void sbtnMoreHighlight_Click(object sender, EventArgs e)
@@ -2305,19 +2474,64 @@ namespace Analogy
             contextMenuStripFilters.Show(sbtnPreDefinedFilters.PointToScreen(sbtnPreDefinedFilters.Location));
         }
 
-        private void timer2_Tick(object sender, EventArgs e)
+        public void EnableFileReload(string fileName)
         {
-            if (simClear)
+            LoadedFiles = new List<string>() { fileName };
+            bbtnReload.Visibility = BarItemVisibility.Always;
+        }
+
+        public void SetReloadColorDate(DateTime value) => reloadDateTime = value;
+
+        private void bBtnSaveCurrentSelectionCustomFormat_ItemClick(object sender, ItemClickEventArgs e)
+        {
+
+            SaveMessagesToLog(FileDataProvider, GetMessagesFromSelectedRowInGrid(out _));
+        }
+
+        private void bBtnSaveCurrentSelectionAnalogyFormat_ItemClick(object sender, ItemClickEventArgs e)
+        {
+            SaveMessagesToLog(AnalogyOfflineDataProvider, GetMessagesFromSelectedRowInGrid(out _));
+
+        }
+
+        private void bBtnUndockSelection_ItemClick(object sender, ItemClickEventArgs e)
+        {
+            var msg = GetMessagesFromSelectedRowInGrid(out var source);
+            if (!msg.Any() || source == null) return;
+            XtraFormLogGrid grid = new XtraFormLogGrid(msg, source, DataProvider, FileDataProvider);
+            lockExternalWindowsObject.EnterWriteLock();
+            _externalWindows.Add(grid);
+            Interlocked.Increment(ref ExternalWindowsCount);
+            lockExternalWindowsObject.ExitWriteLock();
+            grid.FormClosing += (s, arg) =>
             {
-                txtbInclude.Text = "";
-                simClear = false;
-                return;
-            }
-            else
+                lockExternalWindowsObject.EnterWriteLock();
+                Interlocked.Decrement(ref ExternalWindowsCount);
+                _externalWindows.Remove(grid);
+                lockExternalWindowsObject.ExitWriteLock();
+            };
+            grid.Show(this);
+        }
+
+        private void nudGroupBychars_ValueChanged(object sender, EventArgs e)
+        {
+            rbGroupByTextLength.Checked = true;
+        }
+
+        private void txtbGroupByChars_Click(object sender, EventArgs e)
+        {
+            rbGroupByText.Checked = true;
+        }
+
+        private void tsmiAddCommentToMessage_Click(object sender, EventArgs e)
+        {
+            var msg = GetMessageFromSelectedFocusedRowInGrid();
+            if (msg.message != null)
             {
-                txtbInclude.Text = "8 | 9";
-                simClear = true;
+                var addNoteForm = new AnalogyAddCommentsToMessage(msg.message);
+                addNoteForm.Show(this);
             }
+
         }
     }
 }

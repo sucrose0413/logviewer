@@ -1,20 +1,21 @@
+using Analogy.Interfaces;
 using DevExpress.LookAndFeel;
 using DevExpress.XtraBars.Ribbon;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
-using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
-using Analogy.Interfaces;
 
 namespace Analogy
 {
@@ -65,6 +66,8 @@ namespace Analogy
         private static Regex IllegalCharactersRegex = new Regex("[" + @"\/:<>|" + "\"]", RegexOptions.Compiled);
         private static Regex CatchExtentionRegex = new Regex(@"^\s*.+\.([^\.]+)\s*$", RegexOptions.Compiled);
         private static string NonDotCharacters = @"[^.]*";
+      
+
         //
         /// <summary>
         /// 
@@ -115,59 +118,37 @@ namespace Analogy
 
             throw new FileNotFoundException("GeneralDataUtils: File does not exist: " + filename, filename);
         }
-
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static DataTable DataTableConstructor()
         {
 
             DataTable dtb = new DataTable();
-
-            var dtc = new DataColumn("Date", typeof(DateTime));
-            dtb.Columns.Add(dtc);
-            dtc = new DataColumn("TimeDiff", typeof(string));
-            dtb.Columns.Add(dtc);
-
-            dtc = new DataColumn("Text", typeof(string));
-            dtb.Columns.Add(dtc);
-
-            dtc = new DataColumn("Source", typeof(string));
-            dtb.Columns.Add(dtc);
-
-            dtc = new DataColumn("Level", typeof(string));
-            dtb.Columns.Add(dtc);
-
-            dtc = new DataColumn("Class", typeof(string));
-            dtb.Columns.Add(dtc);
-
-            dtc = new DataColumn("Category", typeof(string));
-            dtb.Columns.Add(dtc);
-            dtc = new DataColumn("User", typeof(string));
-            dtb.Columns.Add(dtc);
-
-            dtc = new DataColumn("Module", typeof(string));
-            dtb.Columns.Add(dtc);
-
-            dtc = new DataColumn("Object", typeof(object));
-            dtb.Columns.Add(dtc);
-
-            dtc = new DataColumn("ProcessID", typeof(int));
-            dtb.Columns.Add(dtc);
-            dtc = new DataColumn("ThreadID", typeof(int));
-            dtb.Columns.Add(dtc);
-            dtc = new DataColumn("DataProvider", typeof(string));
-            dtb.Columns.Add(dtc);
+            dtb.Columns.Add(new DataColumn("Date", typeof(DateTime)));
+            dtb.Columns.Add(new DataColumn("TimeDiff", typeof(string)));
+            dtb.Columns.Add(new DataColumn("Text", typeof(string)));
+            dtb.Columns.Add(new DataColumn("Source", typeof(string)));
+            dtb.Columns.Add(new DataColumn("Level", typeof(string)));
+            dtb.Columns.Add(new DataColumn("Class", typeof(string)));
+            dtb.Columns.Add(new DataColumn("Category", typeof(string)));
+            dtb.Columns.Add(new DataColumn("User", typeof(string)));
+            dtb.Columns.Add(new DataColumn("Module", typeof(string)));
+            dtb.Columns.Add(new DataColumn("Object", typeof(object)));
+            dtb.Columns.Add(new DataColumn("ProcessID", typeof(int)));
+            dtb.Columns.Add(new DataColumn("ThreadID", typeof(int)));
+            dtb.Columns.Add(new DataColumn("DataProvider", typeof(string)));
+            dtb.Columns.Add(new DataColumn("MachineName", typeof(string)));
             var manager = ExtensionsManager.Instance;
             foreach (IAnalogyExtension extension in manager.InPlaceRegisteredExtensions)
             {
                 var columns = extension.GetColumnsInfo();
                 foreach (AnalogyColumnInfo column in columns)
                 {
-                    dtc = new DataColumn(column.ColumnName, column.ColumnType);
-                    dtb.Columns.Add(dtc);
+                    dtb.Columns.Add(new DataColumn(column.ColumnName, column.ColumnType));
                 }
             }
             dtb.DefaultView.AllowNew = false;
             dtb.DefaultView.RowStateFilter = DataViewRowState.Unchanged;
-            dtb.DefaultView.Sort =UserSettingsManager.UserSettings.DefaultDescendOrder ?
+            dtb.DefaultView.Sort = UserSettingsManager.UserSettings.DefaultDescendOrder ?
                 "Date DESC" : "Date ASC";
 
             return dtb;
@@ -193,68 +174,12 @@ namespace Analogy
             lookAndFeel.SkinName = skinName;
         }
 
-        //public static List<FileInfo> GetSupportedFiles(DirectoryInfo dirInfo, bool recursive)
-        //{
-        //    List<FileInfo> files = dirInfo.GetFiles("*.etl").Concat(dirInfo.GetFiles("*.log"))
-        //        .Concat(dirInfo.GetFiles("*.nlog")).Concat(dirInfo.GetFiles("*.json"))
-        //        .Concat(dirInfo.GetFiles("defaultFile_*.xml")).Concat(dirInfo.GetFiles("*.evtx")).ToList();
-        //    if (!recursive)
-        //        return files;
-        //    try
-        //    {
-        //        foreach (DirectoryInfo dir in dirInfo.GetDirectories())
-        //        {
-        //            files.AddRange(GetSupportedFiles(dir, true));
-        //        }
-        //    }
-        //    catch (Exception)
-        //    {
-        //        return files;
-        //    }
 
-        //    return files;
-        //}
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static AnalogyLogMessage CreateMessageFromEvent(EventLogEntry eEntry)
-        {
-            AnalogyLogMessage m = new AnalogyLogMessage();
-            switch (eEntry.EntryType)
-            {
-                case EventLogEntryType.Error:
-                    m.Level = AnalogyLogLevel.Error;
-                    break;
-                case EventLogEntryType.Warning:
-                    m.Level = AnalogyLogLevel.Warning;
-                    break;
-                case EventLogEntryType.Information:
-                    m.Level = AnalogyLogLevel.Event;
-                    break;
-                case EventLogEntryType.SuccessAudit:
-                    m.Level = AnalogyLogLevel.Event;
-                    break;
-                case EventLogEntryType.FailureAudit:
-                    m.Level = AnalogyLogLevel.Error;
-                    break;
-                default:
-                    m.Level = AnalogyLogLevel.Event;
-                    break;
-            }
-
-            m.Category = eEntry.Category;
-            m.Date = eEntry.TimeGenerated;
-            m.ID = Guid.NewGuid();
-            m.Source = eEntry.Source;
-            m.Text = eEntry.Message;
-            m.User = eEntry.UserName;
-            m.Module = eEntry.Source;
-            return m;
-        }
 
         public static string GetFileNameAsDataSource(string fileName)
         {
             string file = Path.GetFileName(fileName);
-            return fileName.Equals(file) ? fileName : $"{file} ({fileName})";
-
+            return fileName != null && fileName.Equals(file) ? fileName : $"{file} ({fileName})";
         }
 
         static long GetLastInputTime()
@@ -277,82 +202,119 @@ namespace Analogy
         }
         public static TimeSpan IdleTime() => TimeSpan.FromSeconds(GetLastInputTime());
 
-        
-         
 
-            public static bool MatchedAll(string pattern, IEnumerable<string> files)
-            {
-                Regex reg = Convert(pattern);
-                return files.All(f => reg.IsMatch(f));
-            }
-            public static Regex Convert(string pattern)
-            {
-                if (pattern == null)
-                {
-                    throw new ArgumentNullException();
-                }
-                pattern = pattern.Trim();
-                if (pattern.Length == 0)
-                {
-                    throw new ArgumentException("Pattern is empty.");
-                }
-                if (IllegalCharactersRegex.IsMatch(pattern))
-                {
-                    throw new ArgumentException("Pattern contains illegal characters.");
-                }
-                bool hasExtension = CatchExtentionRegex.IsMatch(pattern);
-                bool matchExact = false;
-                if (HasQuestionMarkRegEx.IsMatch(pattern))
-                {
-                    matchExact = true;
-                }
-                else if (hasExtension)
-                {
-                    matchExact = CatchExtentionRegex.Match(pattern).Groups[1].Length != 3;
-                }
-                string regexString = Regex.Escape(pattern);
-                regexString = "^" + Regex.Replace(regexString, @"\\\*", ".*");
-                regexString = Regex.Replace(regexString, @"\\\?", ".");
-                if (!matchExact && hasExtension)
-                {
-                    regexString += NonDotCharacters;
-                }
-                regexString += "$";
-                Regex regex = new Regex(regexString, RegexOptions.Compiled | RegexOptions.IgnoreCase);
-                return regex;
-            }
-        
-    }
-    
-    public abstract class Saver
-    {
-        public static void ExportToJson(DataTable data, string filename)
+
+
+        public static bool MatchedAll(string pattern, IEnumerable<string> files)
         {
-            List<AnalogyLogMessage> messages = new List<AnalogyLogMessage>();
-            foreach (DataRow dtr in data.Rows)
-            {
-
-                AnalogyLogMessage log = (AnalogyLogMessage)dtr["Object"];
-                messages.Add(log);
-            }
-
-            string json = JsonConvert.SerializeObject(messages);
-            File.WriteAllText(filename, json);
+            Regex reg = Convert(pattern);
+            return files.All(f => reg.IsMatch(f));
         }
-        public static void ExportToJson(List<AnalogyLogMessage> messages, string filename)
+        public static Regex Convert(string pattern)
         {
-            string json = JsonConvert.SerializeObject(messages);
-            File.WriteAllText(filename, json);
+            if (pattern == null)
+            {
+                throw new ArgumentNullException();
+            }
+            pattern = pattern.Trim();
+            if (pattern.Length == 0)
+            {
+                throw new ArgumentException("Pattern is empty.");
+            }
+            if (IllegalCharactersRegex.IsMatch(pattern))
+            {
+                throw new ArgumentException("Pattern contains illegal characters.");
+            }
+            bool hasExtension = CatchExtentionRegex.IsMatch(pattern);
+            bool matchExact = false;
+            if (HasQuestionMarkRegEx.IsMatch(pattern))
+            {
+                matchExact = true;
+            }
+            else if (hasExtension)
+            {
+                matchExact = CatchExtentionRegex.Match(pattern).Groups[1].Length != 3;
+            }
+            string regexString = Regex.Escape(pattern);
+            regexString = "^" + Regex.Replace(regexString, @"\\\*", ".*");
+            regexString = Regex.Replace(regexString, @"\\\?", ".");
+            if (!matchExact && hasExtension)
+            {
+                regexString += NonDotCharacters;
+            }
+            regexString += "$";
+            Regex regex = new Regex(regexString, RegexOptions.Compiled | RegexOptions.IgnoreCase);
+            return regex;
         }
 
-        public static void ExportToCSV(List<AnalogyLogMessage> messages, string fileName)
+        public static async Task<(bool newData, T result)> GetAsync<T>(string uri, string token, DateTime lastModified)
         {
-            string text = string.Join(Environment.NewLine, messages.Select(GetCsvFromMessage).ToArray());
-            File.WriteAllText(fileName, text);
+            try
+            {
+                Uri myUri = new Uri(uri);
+                HttpWebRequest myHttpWebRequest = (HttpWebRequest)WebRequest.Create(myUri);
+                myHttpWebRequest.Accept = "application/json";
+                myHttpWebRequest.UserAgent = "Analogy";
+                if (!string.IsNullOrEmpty(token))
+                    myHttpWebRequest.Headers.Add(HttpRequestHeader.Authorization, $"Token {token}");
+
+                myHttpWebRequest.IfModifiedSince = lastModified;
+
+                HttpWebResponse myHttpWebResponse = (HttpWebResponse)await myHttpWebRequest.GetResponseAsync();
+                if (myHttpWebResponse.StatusCode == HttpStatusCode.NotModified)
+                    return (false, default);
+
+                using (var reader = new System.IO.StreamReader(myHttpWebResponse.GetResponseStream()))
+                {
+                    string responseText = await reader.ReadToEndAsync();
+                    return (true, JsonConvert.DeserializeObject<T>(responseText));
+                }
+            }
+            catch (WebException e) when (((HttpWebResponse)e.Response).StatusCode == HttpStatusCode.NotModified)
+            {
+                return (false, default);
+            }
+            catch (Exception)
+            {
+                return (false, default);
+            }
         }
 
-        private static string GetCsvFromMessage(AnalogyLogMessage m) =>
-        $"ID:{m.ID};Text:{m.Text};Category:{m.Category};Source:{m.Source};Level:{m.Level};Class:{m.Class};Module:{m.Module};Method:{m.MethodName};FileName:{m.FileName};LineNumber:{m.LineNumber};ProcessID:{m.ProcessID};User:{m.User};Parameters:{(m.Parameters == null ? string.Empty : string.Join(",", m.Parameters))}";
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static DataRow CreateRow(DataTable table, AnalogyLogMessage message, string dataSource, bool checkAdditionalInformation)
+        {
+            var dtr = table.NewRow();
+            dtr.BeginEdit();
+            dtr["Date"] = message.Date;
+            dtr["Text"] = message.Text ?? "";
+            dtr["Source"] = message.Source ?? "";
+            dtr["Level"] = string.Intern(message.Level.ToString());
+            dtr["Class"] = string.Intern(message.Class.ToString());
+            dtr["Category"] = message.Category ?? "";
+            dtr["User"] = message.User ?? "";
+            dtr["Module"] = message.Module ?? "";
+            dtr["Object"] = message;
+            dtr["ProcessID"] = message.ProcessId;
+            dtr["ThreadID"] = message.ThreadId;
+            dtr["DataProvider"] = dataSource ?? string.Empty;
+            dtr["MachineName"] = message.MachineName ?? string.Empty;
+            if (checkAdditionalInformation && message.AdditionalInformation != null && message.AdditionalInformation.Any())
+            {
+                foreach (KeyValuePair<string, string> info in message.AdditionalInformation)
+                {if (dtr.Table.Columns.Contains(info.Key))
+                    dtr[info.Key] = info.Value;
+                    else
+                    {
+                        AnalogyLogger.Instance.LogError("",
+                            $"key {info.Key} does not exist in table {table.TableName}");
+                    }
+
+                }
+
+            }
+            return dtr;
+        }
     }
 
     /// <summary>

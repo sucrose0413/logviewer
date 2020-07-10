@@ -143,6 +143,26 @@ namespace Analogy.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
+        internal static System.Drawing.Bitmap Analogy_image_16x16 {
+            get {
+                object obj = ResourceManager.GetObject("Analogy_image_16x16", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap Analogy_image_32x32 {
+            get {
+                object obj = ResourceManager.GetObject("Analogy_image_32x32", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
         internal static System.Drawing.Bitmap Analogy_With_kafka {
             get {
                 object obj = ResourceManager.GetObject("Analogy_With_kafka", resourceCulture);
@@ -153,9 +173,49 @@ namespace Analogy.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
+        internal static System.Drawing.Bitmap AnalogyDark {
+            get {
+                object obj = ResourceManager.GetObject("AnalogyDark", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Icon similar to (Icon).
+        /// </summary>
+        internal static System.Drawing.Icon AnalogyIconDark {
+            get {
+                object obj = ResourceManager.GetObject("AnalogyIconDark", resourceCulture);
+                return ((System.Drawing.Icon)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Icon similar to (Icon).
+        /// </summary>
+        internal static System.Drawing.Icon AnalogyIconLight {
+            get {
+                object obj = ResourceManager.GetObject("AnalogyIconLight", resourceCulture);
+                return ((System.Drawing.Icon)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
         internal static System.Drawing.Bitmap AnalogyIIS128x128 {
             get {
                 object obj = ResourceManager.GetObject("AnalogyIIS128x128", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap AnalogyLight {
+            get {
+                object obj = ResourceManager.GetObject("AnalogyLight", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }
@@ -451,11 +511,22 @@ namespace Analogy.Properties {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Feature is disabled.
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
-        internal static string FeatureDisable {
+        internal static System.Drawing.Bitmap extension16 {
             get {
-                return ResourceManager.GetString("FeatureDisable", resourceCulture);
+                object obj = ResourceManager.GetObject("extension16", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap extension32 {
+            get {
+                object obj = ResourceManager.GetObject("extension32", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
             }
         }
         
@@ -635,6 +706,26 @@ namespace Analogy.Properties {
         internal static System.Drawing.Bitmap KamaMedical {
             get {
                 object obj = ResourceManager.GetObject("KamaMedical", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap LoadFrom_16x16 {
+            get {
+                object obj = ResourceManager.GetObject("LoadFrom_16x16", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap LoadFrom_32x32 {
+            get {
+                object obj = ResourceManager.GetObject("LoadFrom_32x32", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }
@@ -1082,6 +1173,26 @@ namespace Analogy.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
+        internal static System.Drawing.Bitmap Single16x16 {
+            get {
+                object obj = ResourceManager.GetObject("Single16x16", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap Single32x32 {
+            get {
+                object obj = ResourceManager.GetObject("Single32x32", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
         internal static System.Drawing.Bitmap SingleMasterFilter_16x16 {
             get {
                 object obj = ResourceManager.GetObject("SingleMasterFilter_16x16", resourceCulture);
@@ -1105,6 +1216,26 @@ namespace Analogy.Properties {
         internal static System.Drawing.Bitmap Sutotal_32x32 {
             get {
                 object obj = ResourceManager.GetObject("Sutotal_32x32", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap Technology_16x16 {
+            get {
+                object obj = ResourceManager.GetObject("Technology_16x16", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap Technology_32x32 {
+            get {
+                object obj = ResourceManager.GetObject("Technology_32x32", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }
@@ -1155,6 +1286,26 @@ namespace Analogy.Properties {
         internal static System.Drawing.Bitmap upload1 {
             get {
                 object obj = ResourceManager.GetObject("upload1", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap upload16x16 {
+            get {
+                object obj = ResourceManager.GetObject("upload16x16", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap upload32x32 {
+            get {
+                object obj = ResourceManager.GetObject("upload32x32", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }
