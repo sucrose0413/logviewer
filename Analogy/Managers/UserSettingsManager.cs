@@ -1,10 +1,11 @@
-﻿using Analogy.DataProviders;
+﻿using Analogy.CommonUtilities.Web;
+using Analogy.DataTypes;
 using Analogy.Interfaces;
-using Analogy.Interfaces.DataTypes;
 using Analogy.Interfaces.Factories;
 using Analogy.Managers;
 using Analogy.Properties;
-using Analogy.Types;
+using DevExpress.LookAndFeel;
+using DevExpress.XtraBars.Ribbon;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -25,11 +26,16 @@ namespace Analogy
         private static readonly Lazy<UserSettingsManager> _instance =
             new Lazy<UserSettingsManager>(() => new UserSettingsManager());
 
+        private CommandLayout _ribbonStyle;
+        private bool _enableFirstChanceException;
+        public event EventHandler<bool> OnEnableFirstChanceExceptionChanged;
+        public event EventHandler<CommandLayout> OnRibbonControlStyleChanged;
+
         public string ApplicationSkinName { get; set; }
         public static UserSettingsManager UserSettings { get; set; } = _instance.Value;
         public bool SaveSearchFilters { get; set; }
         public string IncludeText { get; set; }
-        public string ExcludedText { get; set; }
+        public string ExcludeText { get; set; }
 
         public string SourceText { get; set; }
         public string ModuleText { get; set; }
@@ -44,14 +50,13 @@ namespace Analogy
         public uint AnalogyOpenedFiles { get; set; }
         public bool EnableFileCaching { get; set; }
         public string DisplayRunningTime => $"{AnalogyRunningTime:dd\\.hh\\:mm\\:ss} days";
-        public bool LoadExtensionsOnStartup { get; set; }
+        // public bool LoadExtensionsOnStartup { get; set; }
         public List<Guid> StartupExtensions { get; set; }
         public bool StartupRibbonMinimized { get; set; }
         public bool StartupErrorLogLevel { get; set; }
         public bool PagingEnabled { get; set; }
         public int PagingSize { get; set; }
         public bool ShowChangeLogAtStartUp { get; set; }
-        public float FontSize { get; set; }
         public bool SearchAlsoInSourceAndModule { get; set; }
         public string InitialSelectedDataProvider { get; set; } = "D3047F5D-CFEB-4A69-8F10-AE5F4D3F2D04";
         public bool IdleMode { get; set; }
@@ -62,7 +67,6 @@ namespace Analogy
         public List<Guid> AutoStartDataProviders { get; set; }
         public bool AutoScrollToLastMessage { get; set; }
         public bool DefaultDescendOrder { get; set; }
-        //public LogParserSettingsContainer LogParsersSettings { get; set; }
         public ColorSettings ColorSettings { get; set; }
         public List<Guid> FactoriesOrder { get; set; }
         public List<FactorySettings> FactoriesSettings { get; set; }
@@ -81,13 +85,52 @@ namespace Analogy
         public string DateTimePattern { get; set; }
         public UpdateMode UpdateMode { get; set; }
         public DateTime LastUpdate { get; set; }
-        public GithubReleaseEntry LastVersionChecked { get; set; }
-        public string GitHubToken { get; } = Environment.GetEnvironmentVariable("AnalogyGitHub_Token");
+        public GithubObjects.GithubReleaseEntry? LastVersionChecked { get; set; }
+        public string GitHubToken { get; } = Environment.GetEnvironmentVariable("AnalogyGitHub_Token") ?? string.Empty;
         public bool MinimizedToTrayBar { get; set; }
         public bool CheckAdditionalInformation { get; set; }
 
         public AnalogyPositionState AnalogyPosition { get; set; }
+        public bool EnableCompressedArchives { get; set; }
+        public bool IsBuiltInSearchPanelVisible { get; set; }
+        public BuiltInSearchPanelMode BuiltInSearchPanelMode { get; set; }
+        public string ApplicationSvgPaletteName { get; set; }
+        public LookAndFeelStyle ApplicationStyle { get; set; } = LookAndFeelStyle.Skin;
+        public bool ShowMessageDetails { get; set; }
+        public bool SimpleMode { get; set; }
+        public bool IsFirstRun { get; set; }
+        public LogLevelSelectionType LogLevelSelection { get; set; }
+        public bool ShowWhatIsNewAtStartup { get; set; }
+        public FontSettings FontSettings { get; set; }
 
+        public bool EnableFirstChanceException
+        {
+            get => _enableFirstChanceException;
+            set
+            {
+                if (_enableFirstChanceException != value)
+                {
+                    _enableFirstChanceException = value;
+                    OnEnableFirstChanceExceptionChanged?.Invoke(this, value);
+                }
+            }
+        }
+
+        public List<DataProviderInformation> SupportedDataProviders { get; set; }
+        public CommandLayout RibbonStyle
+        {
+            get => _ribbonStyle;
+            set
+            {
+                if (_ribbonStyle != value)
+                {
+                    _ribbonStyle = value;
+                    OnRibbonControlStyleChanged?.Invoke(this, value);
+
+                }
+            }
+        }
+        public bool TrackActiveMessage { get; set; }
         public UserSettingsManager()
         {
             Load();
@@ -95,24 +138,56 @@ namespace Analogy
 
         public void Load()
         {
+            SupportedDataProviders = new List<DataProviderInformation>();
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.Serilog", "Analogy.LogViewer.Serilog.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.Serilog"));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.RabbitMq", "Analogy.LogViewer.RabbitMq.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.RabbitMq"));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.RSSReader", "Analogy.LogViewer.RSSReader.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.RSSReader"));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.VisualStudioLogParser", "Analogy.LogViewer.VisualStudioLogParser.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.VisualStudioLogParser"));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.WhatsApp", "Analogy.LogViewer.WhatsApp.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.WhatsApp"));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.XMLParser", "Analogy.LogViewer.XMLParser.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.XMLParser"));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.WCF", "Analogy.LogViewer.WCF.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.WCF"));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.Philips.ICAP", "Analogy.LogViewer.Philips.ICAP.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.Philips.ICAP"));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.Philips.CT", "Analogy.LogViewer.Philips.CT.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.Philips.CT"));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.JsonParser", "Analogy.LogViewer.JsonParser.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.JsonParser"));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.Log4jXml", "Analogy.LogViewer.Log4jXml.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.Log4jXml"));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.KafkaProvider ", "Analogy.LogViewer.KafkaProvider .dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.KafkaProvider"));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.IISLogsProvider", "Analogy.LogViewer.IISLogsProvider.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.IISLogsProvider"));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.Github", "Analogy.LogViewer.Github.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.Github"));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.GitHistory", "Analogy.LogViewer.GitHistory.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.GitHistory"));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.Affirmations", "Analogy.LogViewer.Affirmations.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.Affirmations"));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.Log4Net", "Analogy.LogViewer.Log4Net.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.Log4Net"));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.Nlog", "Analogy.LogViewer.NLogProvider.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.Nlog"));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.PlainTextParser", "Analogy.LogViewer.PlainTextParser.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.PlainTextParser"));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.PowerToys", "Analogy.LogViewer.PowerToys.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.PowerToys"));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.RegexParser", "Analogy.LogViewer.RegexParser.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.RegexParser"));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.gRPC", "Analogy.LogViewer.gRPC.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.gRPC"));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.WindowsEventLogs", "Analogy.LogViewer.WindowsEventLogs.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.WindowsEventLogs"));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.Example", "Analogy.LogViewer.Example.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.Example"));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.GitHubActionLogs", "Analogy.LogViewer.GitHubActionLogs.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.GitHubActionLogs"));
+
+
+            EnableCompressedArchives = true;
             AnalogyInternalLogPeriod = 5;
             if (Settings.Default.UpgradeRequired)
             {
                 Settings.Default.Upgrade();
                 Settings.Default.UpgradeRequired = false;
                 Settings.Default.Save();
+                ShowWhatIsNewAtStartup = true;
             }
 
             DateTimePattern = !string.IsNullOrEmpty(Settings.Default.DateTimePattern)
                 ? Settings.Default.DateTimePattern
                 : "yyyy.MM.dd HH:mm:ss.ff";
+            IsFirstRun = Settings.Default.FirstRun;
             AnalogyIcon = Settings.Default.AnalogyIcon;
             ApplicationSkinName = Settings.Default.ApplicationSkinName;
             EnableUserStatistics = Settings.Default.EnableUserStatistics;
             AnalogyRunningTime = Settings.Default.AnalogyRunningTime;
             AnalogyLaunches = Settings.Default.AnalogyLaunchesCount;
             AnalogyOpenedFiles = Settings.Default.OpenFilesCount;
-            ExcludedText = Settings.Default.ModuleText;
+            ExcludeText = Settings.Default.ExcludeText;
+            IncludeText = Settings.Default.IncludeText;
             SourceText = Settings.Default.SourceText;
             ModuleText = Settings.Default.ModuleText;
             ShowHistoryOfClearedMessages = Settings.Default.ShowHistoryClearedMessages;
@@ -122,14 +197,12 @@ namespace Analogy
             RecentFoldersCount = Settings.Default.RecentFoldersCount;
             RecentFolders = ParseSettings<List<(Guid ID, string Path)>>(Settings.Default.RecentFolders);
             EnableFileCaching = Settings.Default.EnableFileCaching;
-            LoadExtensionsOnStartup = Settings.Default.LoadExtensionsOnStartup;
             StartupExtensions = ParseSettings<List<Guid>>(Settings.Default.StartupExtensions);
             StartupRibbonMinimized = Settings.Default.StartupRibbonMinimized;
             StartupErrorLogLevel = Settings.Default.StartupErrorLogLevel;
             PagingEnabled = Settings.Default.PagingEnabled;
             PagingSize = Settings.Default.PagingSize;
             ShowChangeLogAtStartUp = Settings.Default.ShowChangeLogAtStartUp;
-            FontSize = Settings.Default.FontSize;
             IncludeText = Settings.Default.IncludeText;
             SearchAlsoInSourceAndModule = Settings.Default.SearchAlsoInSourceAndModule;
             IdleMode = Settings.Default.IdleMode;
@@ -140,18 +213,20 @@ namespace Analogy
             ColorSettings = ParseSettings<ColorSettings>(Settings.Default.ColorSettings);
             DefaultDescendOrder = Settings.Default.DefaultDescendOrder;
             FactoriesOrder = ParseSettings<List<Guid>>(Settings.Default.FactoriesOrder);
-            FactoriesSettings = ParseSettings<List<FactorySettings>>(Settings.Default.FactoriesSettings).Where(f => f.FactoryId != Guid.Empty).ToList();
+            FactoriesSettings = ParseSettings<List<FactorySettings>>(Settings.Default.FactoriesSettings)
+                .Where(f => f.FactoryId != Guid.Empty).ToList();
             LastOpenedDataProvider = Settings.Default.LastOpenedDataProvider;
             PreDefinedQueries = ParseSettings<PreDefinedQueries>(Settings.Default.PreDefinedQueries);
             RememberLastOpenedDataProvider = Settings.Default.RememberLastOpenedDataProvider;
             RememberLastSearches = Settings.Default.RememberLastSearches;
             LastSearchesInclude = ParseSettings<List<string>>(Settings.Default.LastSearchesInclude);
             LastSearchesExclude = ParseSettings<List<string>>(Settings.Default.LastSearchesExclude);
+            SimpleMode = Settings.Default.SimpleMode;
             NumberOfLastSearches = Settings.Default.NumberOfLastSearches;
             AdditionalProbingLocations = ParseSettings<List<string>>(Settings.Default.AdditionalProbingLocations);
             SingleInstance = Settings.Default.SingleInstance;
             LastUpdate = Settings.Default.LastUpdate;
-            LastVersionChecked = ParseSettings<GithubReleaseEntry>(Settings.Default.LastVersionChecked);
+            LastVersionChecked = ParseSettings<GithubObjects.GithubReleaseEntry>(Settings.Default.LastVersionChecked);
             switch (Settings.Default.UpdateMode)
             {
                 case 0:
@@ -168,9 +243,32 @@ namespace Analogy
                     break;
             }
 
+            if (Enum.TryParse(Settings.Default.ApplicationStyle, out LookAndFeelStyle style))
+            {
+                ApplicationStyle = style;
+            }
+            if (Enum.TryParse(Settings.Default.LogLevelSelection, out LogLevelSelectionType type))
+            {
+                LogLevelSelection = type;
+            }
+            ApplicationSvgPaletteName = Settings.Default.ApplicationSvgPaletteName;
             MinimizedToTrayBar = Settings.Default.MinimizedToTrayBar;
-            CheckAdditionalInformation = Settings.Default.CheckAdditionalInformation; 
-            AnalogyPosition = ParseSettings<AnalogyPositionState>(Settings.Default.AnalogyPosition) ?? new AnalogyPositionState();
+            CheckAdditionalInformation = Settings.Default.CheckAdditionalInformation;
+            AnalogyPosition = ParseSettings<AnalogyPositionState>(Settings.Default.AnalogyPosition) ??
+                              new AnalogyPositionState();
+            EnableCompressedArchives = Settings.Default.EnableCompressedArchives;
+            IsBuiltInSearchPanelVisible = Settings.Default.IsBuiltInSearchPanelVisible;
+            if (Enum.TryParse(Settings.Default.BuiltInSearchPanelMode, out BuiltInSearchPanelMode result))
+            {
+                BuiltInSearchPanelMode = result;
+            }
+
+            ShowMessageDetails = Settings.Default.ShowMessageDetails;
+            ShowWhatIsNewAtStartup = Settings.Default.ShowWhatIsNewAtStartup;
+            FontSettings = ParseSettings<FontSettings>(Settings.Default.FontSettings);
+            RibbonStyle = (CommandLayout)Settings.Default.RibbonStyle;
+            EnableFirstChanceException = Settings.Default.EnableFirstChanceException;
+            TrackActiveMessage = Settings.Default.TrackActiveMessage;
         }
 
         private T ParseSettings<T>(string data) where T : new()
@@ -191,6 +289,7 @@ namespace Analogy
         }
         public void Save()
         {
+            Settings.Default.FirstRun = false;
             Settings.Default.DateTimePattern = !string.IsNullOrEmpty(DateTimePattern)
                 ? DateTimePattern
                 : "yyyy.MM.dd HH:mm:ss.ff";
@@ -202,6 +301,8 @@ namespace Analogy
             Settings.Default.OpenFilesCount = AnalogyOpenedFiles;
             Settings.Default.ModuleText = ModuleText;
             Settings.Default.SourceText = SourceText;
+            Settings.Default.ExcludeText = ExcludeText;
+            Settings.Default.IncludeText = IncludeText;
             Settings.Default.ShowHistoryClearedMessages = ShowHistoryOfClearedMessages;
             Settings.Default.SaveSearchFilters = SaveSearchFilters;
             Settings.Default.RecentFilesCount = RecentFilesCount;
@@ -209,14 +310,12 @@ namespace Analogy
             Settings.Default.RecentFoldersCount = RecentFoldersCount;
             Settings.Default.RecentFolders = JsonConvert.SerializeObject(RecentFolders.Take(RecentFoldersCount).ToList());
             Settings.Default.EnableFileCaching = EnableFileCaching;
-            Settings.Default.LoadExtensionsOnStartup = LoadExtensionsOnStartup;
             Settings.Default.StartupExtensions = JsonConvert.SerializeObject(StartupExtensions);
             Settings.Default.StartupRibbonMinimized = StartupRibbonMinimized;
             Settings.Default.StartupErrorLogLevel = StartupErrorLogLevel;
             Settings.Default.PagingEnabled = PagingEnabled;
             Settings.Default.PagingSize = PagingSize;
             Settings.Default.ShowChangeLogAtStartUp = false;
-            Settings.Default.FontSize = FontSize;
             Settings.Default.IncludeText = IncludeText;
             Settings.Default.SearchAlsoInSourceAndModule = SearchAlsoInSourceAndModule;
             Settings.Default.IdleMode = IdleMode;
@@ -241,8 +340,21 @@ namespace Analogy
             Settings.Default.UpdateMode = (int)UpdateMode;
             Settings.Default.LastVersionChecked = JsonConvert.SerializeObject(LastVersionChecked);
             Settings.Default.MinimizedToTrayBar = MinimizedToTrayBar;
-            Settings.Default.CheckAdditionalInformation=CheckAdditionalInformation;
+            Settings.Default.CheckAdditionalInformation = CheckAdditionalInformation;
             Settings.Default.AnalogyPosition = JsonConvert.SerializeObject(AnalogyPosition);
+            Settings.Default.EnableCompressedArchives = EnableCompressedArchives;
+            Settings.Default.IsBuiltInSearchPanelVisible = IsBuiltInSearchPanelVisible;
+            Settings.Default.BuiltInSearchPanelMode = BuiltInSearchPanelMode.ToString();
+            Settings.Default.ApplicationStyle = ApplicationStyle.ToString();
+            Settings.Default.ApplicationSvgPaletteName = ApplicationSvgPaletteName;
+            Settings.Default.ShowMessageDetails = ShowMessageDetails;
+            Settings.Default.SimpleMode = SimpleMode;
+            Settings.Default.LogLevelSelection = LogLevelSelection.ToString();
+            Settings.Default.ShowWhatIsNewAtStartup = ShowWhatIsNewAtStartup;
+            Settings.Default.FontSettings = JsonConvert.SerializeObject(FontSettings);
+            Settings.Default.RibbonStyle = (int)RibbonStyle;
+            Settings.Default.EnableFirstChanceException = EnableFirstChanceException;
+            Settings.Default.TrackActiveMessage = TrackActiveMessage;
             Settings.Default.Save();
 
         }
@@ -251,12 +363,16 @@ namespace Analogy
         {
             AnalogyOpenedFiles += 1;
             if (!RecentFiles.Contains((iD, file)))
+            {
                 RecentFiles.Insert(0, (iD, file));
+            }
         }
         public void AddToRecentFolders(Guid iD, string path)
         {
             if (!RecentFolders.Contains((iD, path)))
+            {
                 RecentFolders.Insert(0, (iD, path));
+            }
         }
         public void ClearStatistics()
         {
@@ -302,7 +418,10 @@ namespace Analogy
         public void UpdateOrder(List<Guid> order)
         {
             if (FactoriesOrder.SequenceEqual(order))
+            {
                 return;
+            }
+
             FactoriesOrder = order;
             OnFactoryOrderChanged?.Invoke(this, new EventArgs());
         }
@@ -317,14 +436,20 @@ namespace Analogy
             if (include)
             {
                 if (LastSearchesInclude.Contains(text, StringComparison.InvariantCultureIgnoreCase))
+                {
                     return false;
+                }
+
                 LastSearchesInclude.Add(text);
                 return true;
             }
             else
             {
                 if (LastSearchesExclude.Contains(text, StringComparison.InvariantCultureIgnoreCase))
+                {
                     return false;
+                }
+
                 LastSearchesExclude.Add(text);
                 return true;
             }
@@ -334,7 +459,10 @@ namespace Analogy
         {
             return AnalogyIcon == "Dark" ? Resources.AnalogyIconDark : Resources.AnalogyIconLight;
         }
-
+        public Image GetImage()
+        {
+            return AnalogyIcon == "Dark" ? Resources.AnalogyDark : Resources.AnalogyLight;
+        }
 
         public IEnumerable<(Guid ID, string FileName)> GetRecentFiles(Guid offlineAnalogyId) =>
             RecentFiles.Where(itm => itm.ID == offlineAnalogyId);
@@ -343,35 +471,25 @@ namespace Analogy
             RecentFolders.Where(itm => itm.ID == offlineAnalogyId);
 
     }
-    [Serializable]
-    public class LogParserSettingsContainer
-    {
-        public ILogParserSettings NLogParserSettings { get; set; }
 
-        public LogParserSettingsContainer()
-        {
-            NLogParserSettings = new LogParserSettings();
-            NLogParserSettings.Splitter = "|";
-
-        }
-
-    }
     [Serializable]
     public class ColorSettings
     {
-        public Dictionary<AnalogyLogLevel, Color> LogLevelColors { get; set; }
+        public bool EnableMessagesColors { get; set; }
+        public Dictionary<AnalogyLogLevel, (Color BackgroundColor, Color TextColor)> LogLevelColors { get; set; }
 
-        public Color HighlightColor { get; set; }
-        public Color NewMessagesColor { get; set; }
+        public (Color BackgroundColor, Color TextColor) HighlightColor { get; set; }
+        public (Color BackgroundColor, Color TextColor) NewMessagesColor { get; set; }
         public bool EnableNewMessagesColor { get; set; }
         public bool OverrideLogLevelColor { get; set; }
 
         public ColorSettings()
         {
-            HighlightColor = Color.Aqua;
-            NewMessagesColor = Color.PaleTurquoise;
+            EnableMessagesColors = true;
+            HighlightColor = (Color.Aqua, Color.Black);
+            NewMessagesColor = (Color.PaleTurquoise, Color.Black);
             var logLevelValues = Enum.GetValues(typeof(AnalogyLogLevel));
-            LogLevelColors = new Dictionary<AnalogyLogLevel, Color>(logLevelValues.Length);
+            LogLevelColors = new Dictionary<AnalogyLogLevel, (Color BackgroundColor, Color TextColor)>(logLevelValues.Length);
 
             foreach (AnalogyLogLevel level in logLevelValues)
 
@@ -379,34 +497,34 @@ namespace Analogy
                 switch (level)
                 {
                     case AnalogyLogLevel.Unknown:
-                        LogLevelColors.Add(level, Color.White);
+                        LogLevelColors.Add(level, (Color.White, Color.Black));
                         break;
-                    case AnalogyLogLevel.Disabled:
-                        LogLevelColors.Add(level, Color.LightGray);
+                    case AnalogyLogLevel.None:
+                        LogLevelColors.Add(level, (Color.LightGray, Color.Black));
                         break;
                     case AnalogyLogLevel.Trace:
-                        LogLevelColors.Add(level, Color.White);
+                        LogLevelColors.Add(level, (Color.White, Color.Black));
                         break;
                     case AnalogyLogLevel.Verbose:
-                        LogLevelColors.Add(level, Color.White);
+                        LogLevelColors.Add(level, (Color.White, Color.Black));
                         break;
                     case AnalogyLogLevel.Debug:
-                        LogLevelColors.Add(level, Color.White);
+                        LogLevelColors.Add(level, (Color.White, Color.Black));
                         break;
-                    case AnalogyLogLevel.Event:
-                        LogLevelColors.Add(level, Color.White);
+                    case AnalogyLogLevel.Information:
+                        LogLevelColors.Add(level, (Color.White, Color.Black));
                         break;
                     case AnalogyLogLevel.Warning:
-                        LogLevelColors.Add(level, Color.Yellow);
+                        LogLevelColors.Add(level, (Color.Yellow, Color.Black));
                         break;
                     case AnalogyLogLevel.Error:
-                        LogLevelColors.Add(level, Color.Pink);
+                        LogLevelColors.Add(level, (Color.Pink, Color.Black));
                         break;
                     case AnalogyLogLevel.Critical:
-                        LogLevelColors.Add(level, Color.Red);
+                        LogLevelColors.Add(level, (Color.Red, Color.Black));
                         break;
-                    case AnalogyLogLevel.AnalogyInformation:
-                        LogLevelColors.Add(level, Color.White);
+                    case AnalogyLogLevel.Analogy:
+                        LogLevelColors.Add(level, (Color.White, Color.Black));
                         break;
                     default:
                         throw new ArgumentOutOfRangeException();
@@ -415,14 +533,14 @@ namespace Analogy
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Color GetColorForLogLevel(AnalogyLogLevel level) => LogLevelColors[level];
+        public (Color BackgroundColor, Color TextColor) GetColorForLogLevel(AnalogyLogLevel level) => LogLevelColors[level];
 
-        public Color GetHighlightColor() => HighlightColor;
-        public Color GetNewMessagesColor() => NewMessagesColor;
+        public (Color BackgroundColor, Color TextColor) GetHighlightColor() => HighlightColor;
+        public (Color BackgroundColor, Color TextColor) GetNewMessagesColor() => NewMessagesColor;
 
-        public void SetColorForLogLevel(AnalogyLogLevel level, Color value) => LogLevelColors[level] = value;
-        public void SetHighlightColor(Color value) => HighlightColor = value;
-        public void SetNewMessagesColor(Color value) => NewMessagesColor = value;
+        public void SetColorForLogLevel(AnalogyLogLevel level, Color backgroundColor, Color textColor) => LogLevelColors[level] = (backgroundColor, textColor);
+        public void SetHighlightColor(Color backgroundColor, Color textColor) => HighlightColor = (backgroundColor, textColor);
+        public void SetNewMessagesColor(Color backgroundColor, Color textColor) => NewMessagesColor = (backgroundColor, textColor);
         public string AsJson() => JsonConvert.SerializeObject(this);
         public static ColorSettings FromJson(string fileName) => JsonConvert.DeserializeObject<ColorSettings>(fileName);
     }
@@ -471,18 +589,24 @@ namespace Analogy
         public void RemoveHighlight(PreDefineHighlight highlight)
         {
             if (Highlights.Contains(highlight))
+            {
                 Highlights.Remove(highlight);
+            }
         }
 
         public void RemoveFilter(PreDefineFilter filter)
         {
             if (Filters.Contains(filter))
+            {
                 Filters.Remove(filter);
+            }
         }
         public void RemoveAlert(PreDefineAlert alert)
         {
             if (Alerts.Contains(alert))
+            {
                 Alerts.Remove(alert);
+            }
         }
     }
     [Serializable]

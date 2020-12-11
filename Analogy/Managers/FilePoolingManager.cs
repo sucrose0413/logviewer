@@ -29,7 +29,7 @@ namespace Analogy.Managers
         {
             _sync = new object();
             LogUI = logUI;
-            _customEqualityComparer = new AnalogyLogMessageCustomEqualityComparer { CompareID = false };
+            _customEqualityComparer = new AnalogyLogMessageCustomEqualityComparer { CompareId = false };
             _cancellationTokenSource = new CancellationTokenSource();
             OfflineDataProvider = offlineDataProvider;
             _messages = new List<AnalogyLogMessage>();
@@ -55,7 +55,7 @@ namespace Analogy.Managers
             {
                 Text = $"Start monitoring file {FileName}.",
                 FileName = FileName,
-                Level = AnalogyLogLevel.AnalogyInformation,
+                Level = AnalogyLogLevel.Analogy,
                 Category = "",
                 Source = "Analogy",
                 Class = AnalogyLogClass.General,
@@ -155,13 +155,25 @@ namespace Analogy.Managers
 
         private async void WatchFile_Changed(object sender, FileSystemEventArgs e)
         {
-            if (_readingInprogress) return;
+            if (_readingInprogress)
+            {
+                return;
+            }
+
             FileInfo f = new FileInfo(e.FullPath);
-            if (lastWriteTime == f.LastWriteTime) return;
+            if (lastWriteTime == f.LastWriteTime)
+            {
+                return;
+            }
+
             lastWriteTime = f.LastWriteTime;
             lock (_sync)
             {
-                if (_readingInprogress) return;
+                if (_readingInprogress)
+                {
+                    return;
+                }
+
                 _watchFile.EnableRaisingEvents = false;
                 _readingInprogress = true;
             }

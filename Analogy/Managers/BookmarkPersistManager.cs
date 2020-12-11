@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Analogy.Interfaces;
@@ -50,12 +51,15 @@ namespace Analogy
         public async Task<List<AnalogyLogMessage>> GetMessages()
         {
             if (fileLoaded || !File.Exists(BookmarkFileName))
+            {
                 return Messages;
+            }
+
             //todo: which format;
             try
             {
-                AnalogyXmlLogFile read = new AnalogyXmlLogFile();
-                Messages = await read.ReadFromFile(BookmarkFileName);
+                AnalogyJsonLogFile read = new AnalogyJsonLogFile();
+                Messages = (await read.ReadFromFile(BookmarkFileName, new CancellationToken(), null)).ToList();
                 fileLoaded = true;
             }
             catch (Exception e)
@@ -89,10 +93,15 @@ namespace Analogy
 
         public void SaveFile()
         {
-            if (!ContentChanged) return;
+            if (!ContentChanged)
+            {
+                return;
+            }
+
             if (!Messages.Any())
             {
                 if (File.Exists(BookmarkFileName))
+                {
                     try
                     {
                         File.Delete(BookmarkFileName);
@@ -101,13 +110,14 @@ namespace Analogy
                     {
                         AnalogyLogManager.Instance.LogError("Error deleting file: " + e, nameof(BookmarkPersistManager));
                     }
+                }
             }
             else
             {
 
                 try
                 {
-                    AnalogyXmlLogFile save = new AnalogyXmlLogFile();
+                    AnalogyJsonLogFile save = new AnalogyJsonLogFile();
                     save.Save(Messages, BookmarkFileName);
                 }
                 catch (Exception e)
