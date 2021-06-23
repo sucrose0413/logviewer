@@ -1,17 +1,17 @@
 ﻿using Analogy.CommonUtilities.Web;
 using Analogy.DataTypes;
+using Analogy.Properties;
 using Analogy.Updater;
 using DevExpress.XtraEditors;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.IO.Compression;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Versioning;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using MyWebClient = Analogy.DataTypes.MyWebClient;
 
 namespace Analogy.Managers
 {
@@ -26,7 +26,7 @@ namespace Analogy.Managers
         public bool EnableUpdate => UpdateMode != UpdateMode.Never;
         private string updaterRepository = @"https://api.github.com/repos/Analogy-LogViewer/Analogy.Updater";
 
-
+        public List<DataProviderInformation> SupportedDataProviders { get; set; }
         public UpdateMode UpdateMode
         {
             get => Settings.UpdateMode;
@@ -111,9 +111,37 @@ namespace Analogy.Managers
             }
         }
 
-        private MyWebClient webClient;
         public UpdateManager()
         {
+            SupportedDataProviders = new List<DataProviderInformation>();
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.Serilog", "Analogy.LogViewer.Serilog.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.Serilog", Resources.serilog32x32));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.RabbitMq", "Analogy.LogViewer.RabbitMq.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.RabbitMq", Resources.rabbitmq32x32));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.RSSReader", "Analogy.LogViewer.RSSReader.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.RSSReader", Resources.rss));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.VisualStudioLogParser", "Analogy.LogViewer.VisualStudioLogParser.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.VisualStudioLogParser", Resources.VS32x32));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.WhatsApp", "Analogy.LogViewer.WhatsApp.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.WhatsApp", Resources.whatsappicon32x32));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.XMLParser", "Analogy.LogViewer.XMLParser.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.XMLParser", Resources.xml32x32));
+            //SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.WCF", "Analogy.LogViewer.WCF.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.WCF", Resources.wcf32x32));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.Philips.ICAP", "Analogy.LogViewer.Philips.ICAP.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.Philips.ICAP", Resources.philips_image_32x32));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.Philips.CT", "Analogy.LogViewer.Philips.CT.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.Philips.CT", Resources.philips_image_32x32));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.JsonParser", "Analogy.LogViewer.JsonParser.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.JsonParser", Resources.jsonfile32x32));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.Log4jXml", "Analogy.LogViewer.Log4jXml.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.Log4jXml", Resources.Log4jXml32x32));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.KafkaProvider ", "Analogy.LogViewer.KafkaProvider .dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.KafkaProvider", Resources.Single32x32));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.IISLogsProvider", "Analogy.LogViewer.IISLogsProvider.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.IISLogsProvider", Resources.iis));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.Github", "Analogy.LogViewer.Github.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.Github", Resources.Git_icon_32x32));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.GitHistory", "Analogy.LogViewer.GitHistory.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.GitHistory", Resources.Git_icon_32x32));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.Affirmations", "Analogy.LogViewer.Affirmations.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.Affirmations", Resources.Affirmations32x32));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.Log4Net", "Analogy.LogViewer.Log4Net.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.Log4Net", Resources.log4net32x32));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.Nlog", "Analogy.LogViewer.NLogProvider.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.Nlog", Resources.nlog));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.PlainTextParser", "Analogy.LogViewer.PlainTextParser.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.PlainTextParser", Resources.Single32x32));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.PowerToys", "Analogy.LogViewer.PowerToys.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.PowerToys", Resources.powertoys32x32));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.RegexParser", "Analogy.LogViewer.RegexParser.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.RegexParser", Resources.Single32x32));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.gRPC", "Analogy.LogViewer.gRPC.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.gRPC", Resources.gRPC32x32));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.WindowsEventLogs", "Analogy.LogViewer.WindowsEventLogs.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.WindowsEventLogs", Resources.OperatingSystem_32x32));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.Example", "Analogy.LogViewer.Example.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.Example", Resources.Analogy_image_32x32));
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.GitHubActionLogs", "Analogy.LogViewer.GitHubActionLogs.dll", "https://api.github.com/repos/Analogy-LogViewer/Analogy.LogViewer.GitHubActionLogs", Resources.actions32x32));
+#if !NETCOREAPP3_1 && !NET
+            SupportedDataProviders.Add(new DataProviderInformation("Analogy.LogViewer.SerialPort", "Analogy.LogViewer.SerialPort.dll", "https://api.github.com/repos/oto313/Analogy.LogViewer.SerialPort", Resources.Analogy_image_32x32));
+#endif
             Assembly assembly = Assembly.GetExecutingAssembly();
             FileVersionInfo fvi = FileVersionInfo.GetVersionInfo(assembly.Location);
             CurrentVersionNumber = fvi.FileVersion;
@@ -167,7 +195,11 @@ namespace Analogy.Managers
                 asset = LastVersionChecked.Assets
                     .FirstOrDefault(a => a.Name.Contains("3.1") || a.Name.Contains("netcoreapp3.1"));
             }
-
+            else if (CurrentFrameworkAttribute.FrameworkName.EndsWith("5.0"))
+            {
+                asset = LastVersionChecked.Assets
+                    .FirstOrDefault(a => a.Name.Contains("net5.0") || a.Name.Contains("net5.0-windows"));
+            }
             return asset;
         }
         public async Task<(string TagName, GithubObjects.GithubAsset UpdaterAsset)?> GetLatestUpdater()
@@ -227,57 +259,7 @@ namespace Analogy.Managers
 
         }
 
-        private void UnzipZipFileIntoTempFolder(string zipPath, string extractPath)
-        {
-            string version="net48";
-            if (CurrentFrameworkAttribute.FrameworkName.EndsWith("4.7.1"))
-            {
-                version = "net471";
-            }
-            else if (CurrentFrameworkAttribute.FrameworkName.EndsWith("4.7.2"))
-            {
-                version = "net472";
-            }
-            else if (CurrentFrameworkAttribute.FrameworkName.EndsWith("4.8"))
-            {
-                version = "net48";
-            }
-            else if (CurrentFrameworkAttribute.FrameworkName.EndsWith("3.1"))
-            {
-                version = "netcoreapp3.1";
-            }
-
-            using (FileStream zipToOpen = new FileStream(zipPath, FileMode.Open))
-            {
-                using (ZipArchive archive = new ZipArchive(zipToOpen, ZipArchiveMode.Read))
-                {
-                    //build a list of files to be extracted
-                    var entries = archive.Entries.Where(entry =>
-                        !entry.FullName.EndsWith("/") && entry.FullName.Contains(version));
-                    foreach (ZipArchiveEntry entry in entries)
-                    {
-                        string target = Path.Combine(extractPath, entry.Name);
-                        string directory = Path.GetDirectoryName(target);
-                        if (!Directory.Exists(directory))
-                        {
-                            Directory.CreateDirectory(directory);
-                        }
-
-                        try
-                        {
-                            entry.ExtractToFile(target, true);
-                        }
-                        catch (Exception e)
-                        {
-                            AnalogyLogger.Instance.LogException($"Error unpacking Updater: {e.Message}", e);
-                        }
-
-                    }
-                }
-            }
-        }
-
-        public async Task InitiateUpdate(string title, string downloadURL)
+        public async Task InitiateUpdate(string title, string downloadURL, bool forceOverride)
         {
             if (string.IsNullOrEmpty(title) || string.IsNullOrEmpty(downloadURL))
             {
@@ -293,7 +275,8 @@ namespace Analogy.Managers
                 if (File.Exists(UpdaterExecutable))
                 {
                     var processStartInfo = new ProcessStartInfo();
-                    string data = $"\"{title}\" {downloadURL} \"{Utils.CurrentDirectory()}\"";
+                    //string data = $"\"Title={title}\" DownloadURL:{downloadURL} \"TargetFolder:{Utils.CurrentDirectory()}\" OverrideFiles={forceOverride}";
+                    string data = $"\"{title}\" {downloadURL} \"{Utils.CurrentDirectory()}\" {forceOverride}";
                     processStartInfo.Arguments = data;
                     processStartInfo.Verb = "runas";
                     processStartInfo.FileName = UpdaterExecutable;

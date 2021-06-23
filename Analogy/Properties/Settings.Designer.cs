@@ -12,7 +12,7 @@ namespace Analogy.Properties {
     
     
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.Editors.SettingsDesigner.SettingsSingleFileGenerator", "16.8.1.0")]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.Editors.SettingsDesigner.SettingsSingleFileGenerator", "16.10.0.0")]
     internal sealed partial class Settings : global::System.Configuration.ApplicationSettingsBase {
         
         private static Settings defaultInstance = ((Settings)(global::System.Configuration.ApplicationSettingsBase.Synchronized(new Settings())));
@@ -145,7 +145,7 @@ namespace Analogy.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        [global::System.Configuration.DefaultSettingValueAttribute("DevExpress Style")]
         public string ApplicationSkinName {
             get {
                 return ((string)(this["ApplicationSkinName"]));
@@ -169,7 +169,7 @@ namespace Analogy.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
         public bool EnableFileCaching {
             get {
                 return ((bool)(this["EnableFileCaching"]));
@@ -412,23 +412,26 @@ namespace Analogy.Properties {
         [global::System.Configuration.DefaultSettingValueAttribute("[{\"FactoryName\":\"Analogy Logs Formats\",\"FactoryId\":\"d3047f5d-cfeb-4a69-8f10-ae5f4" +
             "d3f2d04\",\"UserSettingFileAssociations\":[],\"Status\":1},{\"FactoryName\":\"Analogy Ex" +
             "amples\",\"FactoryId\":\"4b1ebc0f-64dd-44a1-bc27-79dbfc6384cc\",\"UserSettingFileAssoc" +
-            "iations\":[],\"Status\":2},{\"FactoryName\":\"gRPC Receiver\",\"FactoryId\":\"9bd37cc2-daa" +
+            "iations\":[],\"Status\":1},{\"FactoryName\":\"gRPC Receiver\",\"FactoryId\":\"9bd37cc2-daa" +
             "7-4d17-974c-01ef3f3c79ba\",\"UserSettingFileAssociations\":[],\"Status\":1},{\"Factory" +
             "Name\":\"IIS Parser\",\"FactoryId\":\"ad7187b1-bd09-4bfe-a28b-3fd3de879009\",\"UserSetti" +
-            "ngFileAssociations\":[],\"Status\":1},{\"FactoryName\":\"Json Log Parser\",\"FactoryId\":" +
+            "ngFileAssociations\":[],\"Status\":2},{\"FactoryName\":\"Json Log Parser\",\"FactoryId\":" +
             "\"d7146342-aeb2-4bd5-8710-7d1bf06ea5cf\",\"UserSettingFileAssociations\":[],\"Status\"" +
             ":1},{\"FactoryName\":\"Log4Net Parser\",\"FactoryId\":\"dbc17c75-5212-46e3-b98a-539e779" +
             "000e3\",\"UserSettingFileAssociations\":[],\"Status\":1},{\"FactoryName\":\"NLogs Parser" +
             "\",\"FactoryId\":\"33cbfa00-da3e-4f9f-b5a1-be978fd09d57\",\"UserSettingFileAssociation" +
             "s\":[],\"Status\":1},{\"FactoryName\":\"Plain Text Parser\",\"FactoryId\":\"11cbfa00-da2e-" +
-            "2f9f-b5a1-be978fd09d57\",\"UserSettingFileAssociations\":[],\"Status\":1},{\"FactoryNa" +
+            "2f9f-b5a1-be978fd09d57\",\"UserSettingFileAssociations\":[],\"Status\":2},{\"FactoryNa" +
             "me\":\"Regular Expression Parser\",\"FactoryId\":\"7da2570c-92aa-423f-bcd8-43bb877463f" +
-            "6\",\"UserSettingFileAssociations\":[],\"Status\":1},{\"FactoryName\":\"Serilog Parser\"," +
+            "6\",\"UserSettingFileAssociations\":[],\"Status\":2},{\"FactoryName\":\"Serilog Parser\"," +
             "\"FactoryId\":\"513a4393-425e-4054-92d4-6a816983e51f\",\"UserSettingFileAssociations\"" +
             ":[],\"Status\":1},{\"FactoryName\":\"Windows Event logs\",\"FactoryId\":\"3999db4c-0e22-4" +
             "795-92c1-61b05edb3f6c\",\"UserSettingFileAssociations\":[],\"Status\":1},{\"FactoryNam" +
             "e\":\"XML Text Parser\",\"FactoryId\":\"9652600e-1b14-4812-bcec-9a6194db9aea\",\"UserSet" +
-            "tingFileAssociations\":[],\"Status\":1}]")]
+            "tingFileAssociations\":[],\"Status\":1},{\"FactoryName\":\"Git History\",\"FactoryId\":\"b" +
+            "842cc0f-ad83-48fb-8394-3189f9a75024\",\"UserSettingFileAssociations\":[],\"Status\":2" +
+            "},{\"FactoryName\":\"GitHub\",\"FactoryId\":\"8064229a-2605-42fa-9e72-75444e4ab13f\",\"Us" +
+            "erSettingFileAssociations\":[],\"Status\":2}]")]
         public string FactoriesSettings {
             get {
                 return ((string)(this["FactoriesSettings"]));
@@ -716,7 +719,7 @@ namespace Analogy.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        [global::System.Configuration.DefaultSettingValueAttribute("Skin")]
         public string ApplicationStyle {
             get {
                 return ((string)(this["ApplicationStyle"]));
@@ -788,8 +791,7 @@ namespace Analogy.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("{\"GridFontSize\":8.5,\"FontName\":\"Tahoma\",\"FontSize\":8.25,\"MenuFontName\":\"Segoe UI\"" +
-            ",\"MenuFontSize\":12.0}")]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
         public string FontSettings {
             get {
                 return ((string)(this["FontSettings"]));
@@ -832,6 +834,126 @@ namespace Analogy.Properties {
             }
             set {
                 this["TrackActiveMessage"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("1")]
+        public float RealTimeRefreshInterval {
+            get {
+                return ((float)(this["RealTimeRefreshInterval"]));
+            }
+            set {
+                this["RealTimeRefreshInterval"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string FilteringExclusion {
+            get {
+                return ((string)(this["FilteringExclusion"]));
+            }
+            set {
+                this["FilteringExclusion"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string LogsLayoutFileName {
+            get {
+                return ((string)(this["LogsLayoutFileName"]));
+            }
+            set {
+                this["LogsLayoutFileName"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool UseCustomLogsLayout {
+            get {
+                return ((bool)(this["UseCustomLogsLayout"]));
+            }
+            set {
+                this["UseCustomLogsLayout"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool ViewDetailedMessageWithHTML {
+            get {
+                return ((bool)(this["ViewDetailedMessageWithHTML"]));
+            }
+            set {
+                this["ViewDetailedMessageWithHTML"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("PerUser")]
+        public string SettingsMode {
+            get {
+                return ((string)(this["SettingsMode"]));
+            }
+            set {
+                this["SettingsMode"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("RibbonForm")]
+        public string MainFormType {
+            get {
+                return ((string)(this["MainFormType"]));
+            }
+            set {
+                this["MainFormType"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string DefaultUserLogFolder {
+            get {
+                return ((string)(this["DefaultUserLogFolder"]));
+            }
+            set {
+                this["DefaultUserLogFolder"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public double TimeOffset {
+            get {
+                return ((double)(this["TimeOffset"]));
+            }
+            set {
+                this["TimeOffset"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("None")]
+        public string TimeOffsetType {
+            get {
+                return ((string)(this["TimeOffsetType"]));
+            }
+            set {
+                this["TimeOffsetType"] = value;
             }
         }
     }

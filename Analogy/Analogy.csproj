@@ -4,7 +4,7 @@
 		<GenerateAssemblyInfo>true</GenerateAssemblyInfo>
 		<OutputType>WinExe</OutputType>
 		<NeutralLanguage>en-US</NeutralLanguage>
-		<TargetFrameworks>net48;net472;net471;netcoreapp3.1</TargetFrameworks>
+		<TargetFrameworks>net48;net472;net471;netcoreapp3.1;net5.0-windows</TargetFrameworks>
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
 		<EmbedUntrackedSources>true</EmbedUntrackedSources>
 		<IncludeSymbols>true</IncludeSymbols>
@@ -25,8 +25,8 @@
 		<RepositoryUrl>https://github.com/Analogy-LogViewer/Analogy.LogViewer</RepositoryUrl>
 		<PackageTags />
 		<RepositoryType>git</RepositoryType>
-		<Version>4.3.3</Version>
-		<Copyright>Lior Banai © 2020</Copyright>
+		<Version>4.7.3</Version>
+		<Copyright>Lior Banai © 2019-2020</Copyright>
 		<Product>Analogy Log Viewer</Product>
 		<PackageReleaseNotes></PackageReleaseNotes>
 		<Company>Analogy.LogViewer</Company>
@@ -34,69 +34,106 @@
 		<Nullable>enable</Nullable>
 		<LangVersion>8.0</LangVersion>
 		<ApplicationManifest>app.manifest</ApplicationManifest>
+		<Platforms>AnyCPU;x64</Platforms>
 	</PropertyGroup>
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net471|AnyCPU'">
 		<PlatformTarget>AnyCPU</PlatformTarget>
 	</PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net471|x64'">
+	  <PlatformTarget>AnyCPU</PlatformTarget>
+	</PropertyGroup>
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net472|AnyCPU'">
+		<PlatformTarget>AnyCPU</PlatformTarget>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net472|x64'">
 	  <PlatformTarget>AnyCPU</PlatformTarget>
 	</PropertyGroup>
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net48|AnyCPU'">
 		<PlatformTarget>AnyCPU</PlatformTarget>
+		<DebugType>full</DebugType>
+		<DebugSymbols>true</DebugSymbols>
 	</PropertyGroup>
-
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net48|x64'">
+	  <PlatformTarget>AnyCPU</PlatformTarget>
+	  <DebugType>full</DebugType>
+	  <DebugSymbols>true</DebugSymbols>
+	</PropertyGroup>
 	<ItemGroup>
-		<None Remove="App.config" Condition=" '$(TargetFramework)' == 'netcoreapp3.1' " />
+		<Compile Remove="UserControls\UCLogsNonFloatable.cs" />
+		<Compile Remove="UserControls\UCLogsNonFloatable.Designer.cs" />
 	</ItemGroup>
 	<ItemGroup>
-		<PackageReference Include="Analogy.CommonUtilities" Version="1.4.4" />
-		<PackageReference Include="Analogy.LogViewer.Interfaces" Version="2.9.0" />
-		<PackageReference Include="Analogy.LogViewer.Template" Version="1.8.0" />
-		<PackageReference Include="MessagePack" Version="2.2.60" />
-		<PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
+		<EmbeddedResource Remove="UserControls\UCLogsNonFloatable.resx" />
+	</ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="Analogy.CommonUtilities" Version="1.5.1" />
+		<PackageReference Include="Analogy.LogViewer.Interfaces" Version="2.13.0" />
+		<PackageReference Include="Analogy.LogViewer.Template" Version="1.9.1" />
+		<PackageReference Include="Grpc.Core" Version="2.38.0" />
+		<PackageReference Include="Markdig" Version="0.25.0" />
+		<PackageReference Include="Markdig.SyntaxHighlighting" Version="1.1.7" />
+		<PackageReference Include="MessagePack" Version="2.2.85" />
+		<PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+		<PackageReference Include="System.Drawing.Common" Version="5.0.2" />
 		<PackageReference Include="System.IO.Compression" Version="4.3.0" />
 		<PackageReference Include="System.Resources.Extensions" Version="5.0.0" />
 		<PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.0.0">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="Analogy.LogViewer.JsonParser" Version="0.3.8">
+		<PackageReference Include="Analogy.LogViewer.JsonParser" Version="0.5.0">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="Analogy.LogViewer.XMLParser" Version="0.3.8">
+		<PackageReference Include="Analogy.LogViewer.XMLParser" Version="0.5.0">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="Analogy.LogViewer.Example" Version="1.9.6">
+		<PackageReference Include="Analogy.LogViewer.Example" Version="2.1.1">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="Analogy.LogViewer.IISLogsProvider" Version="1.5.1">
+		<PackageReference Include="Analogy.LogViewer.IISLogsProvider" Version="1.6.1">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="Analogy.LogViewer.Log4Net" Version="1.5.0">
+		<PackageReference Include="Analogy.LogViewer.Log4Net" Version="1.6.1">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="Analogy.LogViewer.NLogProvider" Version="1.5.0">
+		<PackageReference Include="Analogy.LogViewer.NLogProvider" Version="1.6.1">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="Analogy.LogViewer.PlainTextParser" Version="1.4.5">
+		<PackageReference Include="Analogy.LogViewer.PlainTextParser" Version="1.5.1">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="Analogy.LogViewer.RegexParser" Version="1.8.0">
+		<PackageReference Include="Analogy.LogViewer.RegexParser" Version="1.9.0">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="Analogy.LogViewer.WindowsEventLogs" Version="1.5.0">
+		<PackageReference Include="Analogy.LogViewer.WindowsEventLogs" Version="1.6.1">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="Analogy.LogViewer.Serilog" Version="2.2.2">
+		<PackageReference Include="Analogy.LogViewer.Serilog" Version="2.4.1">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+		<PackageReference Include="Analogy.LogViewer.GitHistory" Version="1.5.1">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+		<PackageReference Include="Analogy.LogViewer.Github" Version="1.5.1">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+		<PackageReference Include="Analogy.LogViewer.gRPC" Version="1.7.2">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+		<PackageReference Include="Analogy.LogViewer.PowerToys" Version="0.2.1">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
@@ -106,8 +143,8 @@
 			<DependentUpon>MainForm.cs</DependentUpon>
 		</EmbeddedResource>
 		<EmbeddedResource Update="Tools\JsonViewer\JsonNodeImages.resx">
-		  <Generator>PublicResXFileCodeGenerator</Generator>
-		  <LastGenOutput>JsonNodeImages.Designer.cs</LastGenOutput>
+			<Generator>PublicResXFileCodeGenerator</Generator>
+			<LastGenOutput>JsonNodeImages.Designer.cs</LastGenOutput>
 		</EmbeddedResource>
 	</ItemGroup>
 
@@ -118,177 +155,300 @@
 		</None>
 	</ItemGroup>
 
-	<ItemGroup Condition=" '$(TargetFramework)' == 'netcoreapp3.1' ">
-		<Reference Include="DevExpress.BonusSkins.v19.1">
-			<HintPath>DevExpress\.net core\DevExpress.BonusSkins.v19.1.dll</HintPath>
+
+	<ItemGroup Condition=" '$(TargetFramework)' == 'netcoreapp3.1' or '$(TargetFramework)' == 'net5.0-windows' ">
+		<Reference Include="DevExpress.BonusSkins.v21.1">
+			<HintPath>DevExpress\.net core\DevExpress.BonusSkins.v21.1.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.Charts.v19.1.Core">
-			<HintPath>DevExpress\.net core\DevExpress.Charts.v19.1.Core.dll</HintPath>
+		<Reference Include="DevExpress.Charts.v21.1.Core">
+			<HintPath>DevExpress\.net core\DevExpress.Charts.v21.1.Core.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.Data.v19.1">
-			<HintPath>DevExpress\.net core\DevExpress.Data.v19.1.dll</HintPath>
+		<Reference Include="DevExpress.Data.v21.1">
+			<HintPath>DevExpress\.net core\DevExpress.Data.v21.1.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.Images.v19.1">
-			<HintPath>DevExpress\.net core\DevExpress.Images.v19.1.dll</HintPath>
+		<Reference Include="DevExpress.Data.Desktop.v21.1">
+			<HintPath>DevExpress\.net core\DevExpress.Data.Desktop.v21.1.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.Mvvm.v19.1">
-			<HintPath>DevExpress\.net core\DevExpress.Mvvm.v19.1.dll</HintPath>
+		<Reference Include="DevExpress.Images.v21.1">
+			<HintPath>DevExpress\.net core\DevExpress.Images.v21.1.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.Mvvm.v19.1.DataModel">
-			<HintPath>DevExpress\.net core\DevExpress.Mvvm.v19.1.DataModel.dll</HintPath>
+		<Reference Include="DevExpress.Mvvm.v21.1">
+			<HintPath>DevExpress\.net core\DevExpress.Mvvm.v21.1.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.Mvvm.v19.1.ViewModel">
-			<HintPath>DevExpress\.net core\DevExpress.Mvvm.v19.1.ViewModel.dll</HintPath>
+		<Reference Include="DevExpress.Mvvm.v21.1.DataModel">
+			<HintPath>DevExpress\.net core\DevExpress.Mvvm.v21.1.DataModel.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.Office.v19.1.Core">
-			<HintPath>DevExpress\.net core\DevExpress.Office.v19.1.Core.dll</HintPath>
+		<Reference Include="DevExpress.Mvvm.v21.1.ViewModel">
+			<HintPath>DevExpress\.net core\DevExpress.Mvvm.v21.1.ViewModel.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.Pdf.v19.1.Core">
-			<HintPath>DevExpress\.net core\DevExpress.Pdf.v19.1.Core.dll</HintPath>
+		<Reference Include="DevExpress.Office.v21.1.Core">
+			<HintPath>DevExpress\.net core\DevExpress.Office.v21.1.Core.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.Printing.v19.1.Core">
-			<HintPath>DevExpress\.net core\DevExpress.Printing.v19.1.Core.dll</HintPath>
+		<Reference Include="DevExpress.Pdf.v21.1.Core">
+			<HintPath>DevExpress\.net core\DevExpress.Pdf.v21.1.Core.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.RichEdit.v19.1.Core">
-			<HintPath>DevExpress\.net core\DevExpress.RichEdit.v19.1.Core.dll</HintPath>
+		<Reference Include="DevExpress.Printing.v21.1.Core">
+			<HintPath>DevExpress\.net core\DevExpress.Printing.v21.1.Core.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.Sparkline.v19.1.Core">
-			<HintPath>DevExpress\.net core\DevExpress.Sparkline.v19.1.Core.dll</HintPath>
+		<Reference Include="DevExpress.RichEdit.v21.1.Core">
+			<HintPath>DevExpress\.net core\DevExpress.RichEdit.v21.1.Core.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.Utils.v19.1">
-			<HintPath>DevExpress\.net core\DevExpress.Utils.v19.1.dll</HintPath>
+		<Reference Include="DevExpress.Sparkline.v21.1.Core">
+			<HintPath>DevExpress\.net core\DevExpress.Sparkline.v21.1.Core.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.Utils.v19.1.UI">
-			<HintPath>DevExpress\.net core\DevExpress.Utils.v19.1.UI.dll</HintPath>
+		<Reference Include="DevExpress.Utils.v21.1">
+			<HintPath>DevExpress\.net core\DevExpress.Utils.v21.1.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.XtraBars.v19.1">
-			<HintPath>DevExpress\.net core\DevExpress.XtraBars.v19.1.dll</HintPath>
+		<Reference Include="DevExpress.Utils.v21.1.UI">
+			<HintPath>DevExpress\.net core\DevExpress.Utils.v21.1.UI.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.XtraCharts.v19.1">
-			<HintPath>DevExpress\.net core\DevExpress.XtraCharts.v19.1.dll</HintPath>
+		<Reference Include="DevExpress.XtraBars.v21.1">
+			<HintPath>DevExpress\.net core\DevExpress.XtraBars.v21.1.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.XtraCharts.v19.1.Extensions">
-			<HintPath>DevExpress\.net core\DevExpress.XtraCharts.v19.1.Extensions.dll</HintPath>
+		<Reference Include="DevExpress.XtraCharts.v21.1">
+			<HintPath>DevExpress\.net core\DevExpress.XtraCharts.v21.1.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.XtraCharts.v19.1.UI">
-			<HintPath>DevExpress\.net core\DevExpress.XtraCharts.v19.1.UI.dll</HintPath>
+		<Reference Include="DevExpress.XtraCharts.v21.1.Extensions">
+			<HintPath>DevExpress\.net core\DevExpress.XtraCharts.v21.1.Extensions.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.XtraCharts.v19.1.Web">
-			<HintPath>DevExpress\.net core\DevExpress.XtraCharts.v19.1.Web.dll</HintPath>
+		<Reference Include="DevExpress.XtraCharts.v21.1.UI">
+			<HintPath>DevExpress\.net core\DevExpress.XtraCharts.v21.1.UI.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.XtraCharts.v19.1.Wizard">
-			<HintPath>DevExpress\.net core\DevExpress.XtraCharts.v19.1.Wizard.dll</HintPath>
+		<Reference Include="DevExpress.XtraCharts.v21.1.Wizard">
+			<HintPath>DevExpress\.net core\DevExpress.XtraCharts.v21.1.Wizard.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.XtraEditors.v19.1">
-			<HintPath>DevExpress\.net core\DevExpress.XtraEditors.v19.1.dll</HintPath>
+		<Reference Include="DevExpress.XtraEditors.v21.1">
+			<HintPath>DevExpress\.net core\DevExpress.XtraEditors.v21.1.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.XtraGrid.v19.1">
-			<HintPath>DevExpress\.net core\DevExpress.XtraGrid.v19.1.dll</HintPath>
+		<Reference Include="DevExpress.XtraGrid.v21.1">
+			<HintPath>DevExpress\.net core\DevExpress.XtraGrid.v21.1.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.XtraLayout.v19.1">
-			<HintPath>DevExpress\.net core\DevExpress.XtraLayout.v19.1.dll</HintPath>
+		<Reference Include="DevExpress.XtraLayout.v21.1">
+			<HintPath>DevExpress\.net core\DevExpress.XtraLayout.v21.1.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.XtraNavBar.v19.1">
-			<HintPath>DevExpress\.net core\DevExpress.XtraNavBar.v19.1.dll</HintPath>
+		<Reference Include="DevExpress.XtraNavBar.v21.1">
+			<HintPath>DevExpress\.net core\DevExpress.XtraNavBar.v21.1.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.XtraPrinting.v19.1">
-			<HintPath>DevExpress\.net core\DevExpress.XtraPrinting.v19.1.dll</HintPath>
+		<Reference Include="DevExpress.XtraPrinting.v21.1">
+			<HintPath>DevExpress\.net core\DevExpress.XtraPrinting.v21.1.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.XtraRichEdit.v19.1">
-			<HintPath>DevExpress\.net core\DevExpress.XtraRichEdit.v19.1.dll</HintPath>
+		<Reference Include="DevExpress.XtraRichEdit.v21.1">
+			<HintPath>DevExpress\.net core\DevExpress.XtraRichEdit.v21.1.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.XtraTreeList.v19.1">
-			<HintPath>DevExpress\.net core\DevExpress.XtraTreeList.v19.1.dll</HintPath>
+		<Reference Include="DevExpress.XtraTreeList.v21.1">
+			<HintPath>DevExpress\.net core\DevExpress.XtraTreeList.v21.1.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.XtraVerticalGrid.v19.1">
-			<HintPath>DevExpress\.net core\DevExpress.XtraVerticalGrid.v19.1.dll</HintPath>
+		<Reference Include="DevExpress.XtraVerticalGrid.v21.1">
+			<HintPath>DevExpress\.net core\DevExpress.XtraVerticalGrid.v21.1.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
 	</ItemGroup>
 
 	<ItemGroup Condition=" '$(TargetFramework)' == 'net48' or '$(TargetFramework)' == 'net472' or '$(TargetFramework)' == 'net471' ">
-		<Reference Include="DevExpress.BonusSkins.v19.1">
-			<HintPath>DevExpress\.net framework\DevExpress.BonusSkins.v19.1.dll</HintPath>
+		<Reference Include="DevExpress.BonusSkins.v21.1">
+			<HintPath>DevExpress\.net framework\DevExpress.BonusSkins.v21.1.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.Charts.v19.1.Core">
-			<HintPath>DevExpress\.net framework\DevExpress.Charts.v19.1.Core.dll</HintPath>
+		<Reference Include="DevExpress.Charts.v21.1.Core">
+			<HintPath>DevExpress\.net framework\DevExpress.Charts.v21.1.Core.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.Data.v19.1">
-			<HintPath>DevExpress\.net framework\DevExpress.Data.v19.1.dll</HintPath>
+		<Reference Include="DevExpress.Data.v21.1">
+			<HintPath>DevExpress\.net framework\DevExpress.Data.v21.1.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.Dialogs.v19.1.Core">
-			<HintPath>DevExpress\.net framework\DevExpress.Dialogs.v19.1.Core.dll</HintPath>
+		<Reference Include="DevExpress.Data.Desktop.v21.1">
+			<HintPath>DevExpress\.net framework\DevExpress.Data.Desktop.v21.1.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.Images.v19.1">
-			<HintPath>DevExpress\.net framework\DevExpress.Images.v19.1.dll</HintPath>
+		<Reference Include="DevExpress.Dialogs.v21.1.Core">
+			<HintPath>DevExpress\.net framework\DevExpress.Dialogs.v21.1.Core.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.Mvvm.v19.1">
-			<HintPath>DevExpress\.net framework\DevExpress.Mvvm.v19.1.dll</HintPath>
+		<Reference Include="DevExpress.Images.v21.1">
+			<HintPath>DevExpress\.net framework\DevExpress.Images.v21.1.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.Mvvm.v19.1.ViewModel">
-			<HintPath>DevExpress\.net framework\DevExpress.Mvvm.v19.1.ViewModel.dll</HintPath>
+		<Reference Include="DevExpress.Mvvm.v21.1">
+			<HintPath>DevExpress\.net framework\DevExpress.Mvvm.v21.1.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.Pdf.v19.1.Core">
-			<HintPath>DevExpress\.net framework\DevExpress.Pdf.v19.1.Core.dll</HintPath>
+		<Reference Include="DevExpress.Mvvm.v21.1.ViewModel">
+			<HintPath>DevExpress\.net framework\DevExpress.Mvvm.v21.1.ViewModel.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.Printing.v19.1.Core">
-			<HintPath>DevExpress\.net framework\DevExpress.Printing.v19.1.Core.dll</HintPath>
+		<Reference Include="DevExpress.Office.v21.1.Core">
+			<HintPath>DevExpress\.net framework\DevExpress.Office.v21.1.Core.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.RichEdit.v19.1.Core">
-			<HintPath>DevExpress\.net framework\DevExpress.RichEdit.v19.1.Core.dll</HintPath>
+		<Reference Include="DevExpress.Pdf.v21.1.Core">
+			<HintPath>DevExpress\.net framework\DevExpress.Pdf.v21.1.Core.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.Sparkline.v19.1.Core">
-			<HintPath>DevExpress\.net framework\DevExpress.Sparkline.v19.1.Core.dll</HintPath>
+		<Reference Include="DevExpress.Printing.v21.1.Core">
+			<HintPath>DevExpress\.net framework\DevExpress.Printing.v21.1.Core.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.Utils.v19.1">
-			<HintPath>DevExpress\.net framework\DevExpress.Utils.v19.1.dll</HintPath>
+		<Reference Include="DevExpress.RichEdit.v21.1.Core">
+			<HintPath>DevExpress\.net framework\DevExpress.RichEdit.v21.1.Core.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.Utils.v19.1.UI">
-			<HintPath>DevExpress\.net framework\DevExpress.Utils.v19.1.UI.dll</HintPath>
+		<Reference Include="DevExpress.Sparkline.v21.1.Core">
+			<HintPath>DevExpress\.net framework\DevExpress.Sparkline.v21.1.Core.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.XtraBars.v19.1">
-			<HintPath>DevExpress\.net framework\DevExpress.XtraBars.v19.1.dll</HintPath>
+		<Reference Include="DevExpress.Utils.v21.1">
+			<HintPath>DevExpress\.net framework\DevExpress.Utils.v21.1.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.XtraCharts.v19.1">
-			<HintPath>DevExpress\.net framework\DevExpress.XtraCharts.v19.1.dll</HintPath>
+		<Reference Include="DevExpress.Utils.v21.1.UI">
+			<HintPath>DevExpress\.net framework\DevExpress.Utils.v21.1.UI.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.XtraCharts.v19.1.Extensions">
-			<HintPath>DevExpress\.net framework\DevExpress.XtraCharts.v19.1.Extensions.dll</HintPath>
+		<Reference Include="DevExpress.XtraBars.v21.1">
+			<HintPath>DevExpress\.net framework\DevExpress.XtraBars.v21.1.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.XtraCharts.v19.1.UI">
-			<HintPath>DevExpress\.net framework\DevExpress.XtraCharts.v19.1.UI.dll</HintPath>
+		<Reference Include="DevExpress.XtraCharts.v21.1">
+			<HintPath>DevExpress\.net framework\DevExpress.XtraCharts.v21.1.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.XtraCharts.v19.1.Web">
-			<HintPath>DevExpress\.net framework\DevExpress.XtraCharts.v19.1.Web.dll</HintPath>
+		<Reference Include="DevExpress.XtraCharts.v21.1.Extensions">
+			<HintPath>DevExpress\.net framework\DevExpress.XtraCharts.v21.1.Extensions.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.XtraCharts.v19.1.Wizard">
-			<HintPath>DevExpress\.net framework\DevExpress.XtraCharts.v19.1.Wizard.dll</HintPath>
+		<Reference Include="DevExpress.XtraCharts.v21.1.UI">
+			<HintPath>DevExpress\.net framework\DevExpress.XtraCharts.v21.1.UI.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.XtraDialogs.v19.1">
-			<HintPath>DevExpress\.net framework\DevExpress.XtraDialogs.v19.1.dll</HintPath>
+		<Reference Include="DevExpress.XtraCharts.v21.1.Web">
+			<HintPath>DevExpress\.net framework\DevExpress.XtraCharts.v21.1.Web.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.XtraEditors.v19.1">
-			<HintPath>DevExpress\.net framework\DevExpress.XtraEditors.v19.1.dll</HintPath>
+		<Reference Include="DevExpress.XtraCharts.v21.1.Wizard">
+			<HintPath>DevExpress\.net framework\DevExpress.XtraCharts.v21.1.Wizard.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.XtraGrid.v19.1">
-			<HintPath>DevExpress\.net framework\DevExpress.XtraGrid.v19.1.dll</HintPath>
+		<Reference Include="DevExpress.XtraDialogs.v21.1">
+			<HintPath>DevExpress\.net framework\DevExpress.XtraDialogs.v21.1.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.XtraLayout.v19.1">
-			<HintPath>DevExpress\.net framework\DevExpress.XtraLayout.v19.1.dll</HintPath>
+		<Reference Include="DevExpress.XtraEditors.v21.1">
+			<HintPath>DevExpress\.net framework\DevExpress.XtraEditors.v21.1.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.XtraNavBar.v19.1">
-			<HintPath>DevExpress\.net framework\DevExpress.XtraNavBar.v19.1.dll</HintPath>
+		<Reference Include="DevExpress.XtraGrid.v21.1">
+			<HintPath>DevExpress\.net framework\DevExpress.XtraGrid.v21.1.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.XtraPrinting.v19.1">
-			<HintPath>DevExpress\.net framework\DevExpress.XtraPrinting.v19.1.dll</HintPath>
+		<Reference Include="DevExpress.XtraLayout.v21.1">
+			<HintPath>DevExpress\.net framework\DevExpress.XtraLayout.v21.1.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.XtraRichEdit.v19.1">
-			<HintPath>DevExpress\.net framework\DevExpress.XtraRichEdit.v19.1.dll</HintPath>
+		<Reference Include="DevExpress.XtraNavBar.v21.1">
+			<HintPath>DevExpress\.net framework\DevExpress.XtraNavBar.v21.1.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.XtraTreeList.v19.1">
-			<HintPath>DevExpress\.net framework\DevExpress.XtraTreeList.v19.1.dll</HintPath>
+		<Reference Include="DevExpress.XtraPrinting.v21.1">
+			<HintPath>DevExpress\.net framework\DevExpress.XtraPrinting.v21.1.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
-		<Reference Include="DevExpress.XtraVerticalGrid.v19.1">
-			<HintPath>DevExpress\.net framework\DevExpress.XtraVerticalGrid.v19.1.dll</HintPath>
+		<Reference Include="DevExpress.XtraRichEdit.v21.1">
+			<HintPath>DevExpress\.net framework\DevExpress.XtraRichEdit.v21.1.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+		</Reference>
+		<Reference Include="DevExpress.XtraTreeList.v21.1">
+			<HintPath>DevExpress\.net framework\DevExpress.XtraTreeList.v21.1.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+		</Reference>
+		<Reference Include="DevExpress.XtraVerticalGrid.v21.1">
+			<HintPath>DevExpress\.net framework\DevExpress.XtraVerticalGrid.v21.1.dll</HintPath>
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
 		</Reference>
 		<Reference Include="System.ComponentModel.DataAnnotations" />
 		<Reference Include="System.Configuration" />
@@ -302,6 +462,9 @@
 		<Reference Include="System.Windows.Forms" />
 
 	</ItemGroup>
+
+
+
 	<ItemGroup Condition=" '$(TargetFramework)' == 'net48' or '$(TargetFramework)' == 'net472' or  '$(TargetFramework)' == 'net471' ">
 		<Compile Update="Forms\AboutDataSourceBox.cs" />
 		<Compile Update="Forms\AboutDataSourceBox.Designer.cs">
@@ -441,10 +604,6 @@
 		<Compile Update="UserControls\MessageDetailsUC.cs" />
 		<Compile Update="UserControls\MessageDetailsUC.Designer.cs">
 			<DependentUpon>MessageDetailsUC.cs</DependentUpon>
-		</Compile>
-		<Compile Update="Forms\UserSettingsForm.cs" />
-		<Compile Update="Forms\UserSettingsForm.Designer.cs">
-			<DependentUpon>UserSettingsForm.cs</DependentUpon>
 		</Compile>
 		<Compile Update="UserControls\UtilityUC.cs" />
 		<Compile Update="UserControls\UtilityUC.Designer.cs">
@@ -632,9 +791,6 @@
 		<EmbeddedResource Update="UserControls\MessageDetailsUC.resx">
 			<DependentUpon>MessageDetailsUC.cs</DependentUpon>
 		</EmbeddedResource>
-		<EmbeddedResource Update="Forms\UserSettingsForm.resx">
-			<DependentUpon>UserSettingsForm.cs</DependentUpon>
-		</EmbeddedResource>
 		<EmbeddedResource Update="UserControls\UtilityUC.resx">
 			<DependentUpon>UtilityUC.cs</DependentUpon>
 		</EmbeddedResource>
@@ -702,7 +858,6 @@
 		<EmbeddedResource Update="Forms\ProcessNameAndID.resx">
 			<DependentUpon>ProcessNameAndID.cs</DependentUpon>
 		</EmbeddedResource>
-		<EmbeddedResource Include="Properties\licenses.licx" />
 		<EmbeddedResource Update="Properties\Resources.resx">
 			<Generator>ResXFileCodeGenerator</Generator>
 			<LastGenOutput>Resources.Designer.cs</LastGenOutput>
@@ -721,9 +876,9 @@
 			<DependentUpon>Settings.settings</DependentUpon>
 		</Compile>
 		<Compile Update="Tools\JsonViewer\JsonNodeImages.Designer.cs">
-		  <DesignTime>True</DesignTime>
-		  <AutoGen>True</AutoGen>
-		  <DependentUpon>JsonNodeImages.resx</DependentUpon>
+			<DesignTime>True</DesignTime>
+			<AutoGen>True</AutoGen>
+			<DependentUpon>JsonNodeImages.resx</DependentUpon>
 		</Compile>
 	</ItemGroup>
 
@@ -733,18 +888,10 @@
 			<LastGenOutput>Settings.Designer.cs</LastGenOutput>
 		</None>
 	</ItemGroup>
-
-	<ItemGroup Condition="'$(TargetFramework)' == 'netcoreapp3.1'">
-		<PackageReference Include="Analogy.LogViewer.gRPC">
-			<Version>1.5.3</Version>
-			<PrivateAssets>all</PrivateAssets>
-			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-		</PackageReference>
-	</ItemGroup>
 	<ItemGroup Condition=" '$(TargetFramework)' == 'net48' or '$(TargetFramework)' == 'net472' or  '$(TargetFramework)' == 'net471' ">
 		<PackageReference Include="WindowsAPICodePack" Version="1.1.1" />
 	</ItemGroup>
 	<ItemGroup>
-	  <Folder Include="Updater\" />
+		<Folder Include="Updater\" />
 	</ItemGroup>
 </Project>

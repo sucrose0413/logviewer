@@ -27,7 +27,7 @@ namespace Analogy
         public DataVisualizerUC(Func<List<AnalogyLogMessage>> messagesFunc) : this()
         {
             Messages = messagesFunc;
-            logStatisticsUC1.Statistics = new LogStatistics(messagesFunc);
+            logStatisticsUC1.Statistics = new LogStatistics(messagesFunc.Invoke());
         }
         public DataVisualizerUC(List<AnalogyLogMessage> messages) : this()
         {
@@ -42,7 +42,7 @@ namespace Analogy
 
         private void Plot()
         {
-            logStatisticsUC1.RefreshStatistics(new LogStatistics(Messages));
+            logStatisticsUC1.RefreshStatistics(new LogStatistics(Messages.Invoke()));
             Dictionary<string, Dictionary<TimeSpan, int>> frequency =
                 new Dictionary<string, Dictionary<TimeSpan, int>>();
             Dictionary<string, Dictionary<TimeSpan, int>> frequencyCount =
@@ -66,47 +66,34 @@ namespace Analogy
                     if (m.Text.Contains(item))
                     {
                         timeDistribution[item].Add(m);
-                        if (!frequency[item].ContainsKey(m.Date.TimeOfDay))
+                        if (!frequency[item].ContainsKey(Utils.GetOffsetTime(m.Date).TimeOfDay))
                         {
-                            frequency[item].Add(m.Date.TimeOfDay, 1);
+                            frequency[item].Add(Utils.GetOffsetTime(m.Date).TimeOfDay, 1);
                         }
 
-                        if (!frequencyCount[item].ContainsKey(m.Date.TimeOfDay))
+                        if (!frequencyCount[item].ContainsKey(Utils.GetOffsetTime(m.Date).TimeOfDay))
                         {
-                            frequencyCount[item].Add(m.Date.TimeOfDay, 1);
+                            frequencyCount[item].Add(Utils.GetOffsetTime(m.Date).TimeOfDay, 1);
                         }
                         else
                         {
-                            frequencyCount[item][m.Date.TimeOfDay] += 1;
+                            frequencyCount[item][Utils.GetOffsetTime(m.Date).TimeOfDay] += 1;
                         }
                     }
                     else
                     {
-                        if (!frequency[item].ContainsKey(m.Date.TimeOfDay))
+                        if (!frequency[item].ContainsKey(Utils.GetOffsetTime(m.Date).TimeOfDay))
                         {
-                            frequency[item].Add(m.Date.TimeOfDay, 0);
+                            frequency[item].Add(Utils.GetOffsetTime(m.Date).TimeOfDay, 0);
                         }
 
-                        if (!frequencyCount[item].ContainsKey(m.Date.TimeOfDay))
+                        if (!frequencyCount[item].ContainsKey(Utils.GetOffsetTime(m.Date).TimeOfDay))
                         {
-                            frequencyCount[item].Add(m.Date.TimeOfDay, 0);
+                            frequencyCount[item].Add(Utils.GetOffsetTime(m.Date).TimeOfDay, 0);
                         }
                     }
                 }
             }
-
-            chartControlOnOff.Series.Clear();
-            chartControlOnOff.DataSource = CreateTable(frequency);
-            chartControlOnOff.SeriesDataMember = "Name";
-            chartControlOnOff.SeriesTemplate.ArgumentDataMember = "Date";
-            chartControlOnOff.SeriesTemplate.ValueDataMembers.AddRange("ValueX");
-
-            chartControlOnOff.SeriesTemplate.ArgumentScaleType = ScaleType.DateTime;
-            chartControlOnOff.SeriesTemplate.ChangeView(ViewType.Line);
-            XYDiagram diagram = (XYDiagram)chartControlOnOff.Diagram;
-            diagram.AxisX.DateTimeScaleOptions.MeasureUnit = DateTimeMeasureUnit.Millisecond;
-            diagram.AxisX.DateTimeScaleOptions.GridAlignment = DateTimeGridAlignment.Hour;
-            diagram.AxisX.Label.TextPattern = "{A:t}";
 
 
             chartControlFrequency.Series.Clear();
@@ -171,8 +158,8 @@ namespace Analogy
                 string item = td.Key;
                 foreach (AnalogyLogMessage val in td.Value)
                 {
-                    tbl.Rows.Add(item, val.Date, val.Date.Ticks,
-                        val.Date.Hour + (float)val.Date.Minute / 60 + (float)val.Date.Second / 60 / 60);
+                    tbl.Rows.Add(item, Utils.GetOffsetTime(val.Date), Utils.GetOffsetTime(val.Date).Ticks,
+                        val.Date.Hour + (float)Utils.GetOffsetTime(val.Date).Minute / 60 + (float)Utils.GetOffsetTime(val.Date).Second / 60 / 60);
                 }
 
             }
@@ -189,20 +176,13 @@ namespace Analogy
 
         private void sBtnAdd_Click(object sender, EventArgs e)
         {
-            if (!string.IsNullOrEmpty(textEdit1.Text))
-            {
-                Items.Add(textEdit1.Text.Substring(textEdit1.Text.IndexOf(':') + 1));
-                chklistItems.Items.Add(textEdit1.Text, true);
-                ceAutoRefresh.Enabled = true;
-                seRefreshInterval.Enabled = true;
-                Plot();
-            }
-            else
-            {
-                Items.Add("");
-                chklistItems.Items.Add("", true);
-                Plot();
-            }
+            string text = !string.IsNullOrEmpty(textEdit1.Text) ? textEdit1.Text : "";
+            Items.Add(text);
+            chklistItems.Items.Add(text, true);
+            ceAutoRefresh.Enabled = true;
+            seRefreshInterval.Enabled = true;
+            Plot();
+
         }
 
         private void seRefreshInterval_EditValueChanged(object sender, EventArgs e)

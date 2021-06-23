@@ -21,7 +21,16 @@ namespace Analogy.Forms
             lblLatestVersion.Text =
                 $"Latest version is: {(Updater.LastVersionChecked?.TagName == null ? "not checked" : Updater.LastVersionChecked.TagName)}";
 
-            if (Updater.LastVersionChecked != null && Updater.LastVersionChecked.TagName != null)
+            if (AnalogyNonPersistSettings.Instance.UpdateAreDisabled)
+            {
+                AnalogyLogManager.Instance.LogWarning("Update is disabled", nameof(UpdateForm));
+                sbtnUpdateNow.Visible = false;
+                sbtnCheck.Visible = false;
+                lblDisableUpdates.Visible = true;
+                return;
+            }
+
+            if (Updater.LastVersionChecked?.TagName != null)
             {
                 richTextBoxRelease.Text = Updater.LastVersionChecked.ToString();
                 hyperLinkEditLatest.Text = Updater.LastVersionChecked.HtmlUrl;
@@ -36,7 +45,8 @@ namespace Analogy.Forms
         {
             var (_, release) = await Updater.CheckVersion(true);
             Settings.LastVersionChecked = release;
-            lblLatestVersion.Text = $"Latest version is: {release.TagName}.";
+            string preRelease = release.PreRelease ? " (This is pre-release version)" : string.Empty;
+            lblLatestVersion.Text = $"Latest version is: {release.TagName}{preRelease}.";
             richTextBoxRelease.Text = release.ToString();
             hyperLinkEditLatest.Text = release.HtmlUrl;
             if (Updater.NewVersionExist)
@@ -49,7 +59,7 @@ namespace Analogy.Forms
         {
             var downloadInfo = Updater.DownloadInformation;
             sbtnUpdateNow.Enabled = false;
-            await Updater.InitiateUpdate(downloadInfo.title, downloadInfo.DownloadURL);
+            await Updater.InitiateUpdate(downloadInfo.title, downloadInfo.DownloadURL,true);
             sbtnUpdateNow.Enabled = true;
         }
     }

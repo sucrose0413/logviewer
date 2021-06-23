@@ -7,6 +7,7 @@ namespace Analogy.DataTypes
 {
     public enum FontSelectionType
     {
+        Default,
         Normal,
         Large,
         VeryLarge,
@@ -28,7 +29,7 @@ namespace Analogy.DataTypes
         [Display(Name = "Each Startup")] EachStartup,
         [Display(Name = "Once a Week")] OnceAWeek,
         [Display(Name = "Once a Month")] OnceAMonth,
-    }    
+    }
     /// <summary>
     /// Represents custom filter item types.
     /// </summary>
@@ -64,6 +65,17 @@ namespace Analogy.DataTypes
         LastMonth
     }
 
+    public enum SettingsMode
+    {
+        PerUser,
+        ApplicationFolder
+    }
+
+    public enum MainFormType
+    {
+        RibbonForm, //classic pre V5
+        FluentForm
+    }
     public static class EnumUtils
     {
         public static string GetDisplay(this Enum value)
@@ -95,5 +107,13 @@ namespace Analogy.DataTypes
 
             return enumValues;
         }
+    }
+
+    public enum TimeOffsetType
+    {
+        None,
+        Predefined,
+        UtcToLocalTime,
+        LocalTimeToUtc
     }
 }

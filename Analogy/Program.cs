@@ -1,4 +1,6 @@
+using Analogy.DataTypes;
 using Analogy.Forms;
+using Analogy.Managers;
 using DevExpress.LookAndFeel;
 using DevExpress.Utils.Drawing.Helpers;
 using DevExpress.XtraEditors;
@@ -10,7 +12,6 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
-using Analogy.Managers;
 
 namespace Analogy
 {
@@ -29,7 +30,11 @@ namespace Analogy
         [STAThread]
         static void Main()
         {
-            AnalogyLogManager.Instance.LogInformation($"OS: {Environment.OSVersion.Version}",nameof(Program));
+            AppDomain.CurrentDomain.AssemblyLoad += CurrentDomain_AssemblyLoad;
+            DevExpress.UserSkins.BonusSkins.Register();
+            WindowsFormsSettings.LoadApplicationSettings();
+            WindowsFormsSettings.SetDPIAware();
+            AnalogyLogManager.Instance.LogInformation($"OS: {Environment.OSVersion.Version}", nameof(Program));
             if (Environment.OSVersion.Version.Major >= 10)
             {
                 WindowsFormsSettings.ForceDirectXPaint();
@@ -37,7 +42,6 @@ namespace Analogy
             Directory.SetCurrentDirectory(AppDomain.CurrentDomain.BaseDirectory);
             AssemblyLocation = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
             AppDomain.CurrentDomain.AssemblyResolve += CurrentDomain_AssemblyResolve;
-            WindowsFormsSettings.LoadApplicationSettings();
             WindowsFormsSettings.DefaultFont = Settings.FontSettings.UIFont;
             WindowsFormsSettings.DefaultMenuFont = Settings.FontSettings.MenuFont;
             Application.ThreadException += Application_ThreadException;
@@ -46,7 +50,6 @@ namespace Analogy
             {
                 AppDomain.CurrentDomain.FirstChanceException += CurrentDomain_FirstChanceException;
             }
-
             Settings.OnEnableFirstChanceExceptionChanged += (s, e) =>
             {
                 if (e)
@@ -60,7 +63,7 @@ namespace Analogy
             };
             Application.SetCompatibleTextRenderingDefault(false);
             Application.EnableVisualStyles();
-#if NETCOREAPP3_1
+#if NETCOREAPP3_1 || NET
             Application.SetHighDpiMode(HighDpiMode.SystemAware);
 #endif
             Settings.IncreaseNumberOfLaunches();
@@ -112,10 +115,29 @@ namespace Analogy
                 FirstTimeRunForm f = new FirstTimeRunForm();
                 f.ShowDialog();
             }
-            Application.Run(new MainForm());
+
+            if (Settings.MainFormType == MainFormType.RibbonForm)
+            {
+                Application.Run(new MainForm());
+            }
+            else
+            {
+                Application.Run(new FluentDesignMainForm());
+            }
 
         }
 
+        private static void CurrentDomain_AssemblyLoad(object sender, AssemblyLoadEventArgs args)
+        {
+            /*
+            Assembly assembly = args.LoadedAssembly;
+
+            File.AppendAllText("assemblies.txt", assembly.FullName + Environment.NewLine);
+            var attribute = assembly.GetCustomAttributes(true).OfType<System.Runtime.Versioning.TargetFrameworkAttribute>().FirstOrDefault();
+            if (attribute != null)
+                File.AppendAllText("assemblies.txt", attribute.FrameworkDisplayName + Environment.NewLine);
+            */
+        }
         public static void SendDataMessage(Process targetProcess, string msg)
         {
             //Copy the string message to a global memory area in unicode format
@@ -179,7 +201,7 @@ namespace Analogy
             }
 
             // check for assemblies already loaded
-            Assembly assembly = AppDomain.CurrentDomain.GetAssemblies()
+            Assembly? assembly = AppDomain.CurrentDomain.GetAssemblies()
                 .FirstOrDefault(a => a.GetName().Name == args.Name);
             if (assembly != null)
             {
@@ -196,7 +218,7 @@ namespace Analogy
 
             var paths = FactoriesManager.Instance.ProbingPaths.Select(Path.GetDirectoryName).Except(new List<string> { AssemblyLocation }).Distinct()
                 .ToList();
-
+            paths.AddRange(AnalogyNonPersistSettings.Instance.AdditionalAssembliesDependenciesLocations);
             foreach (var path in paths)
             {
                 string asmFile = FindFileInPath(filename, path);

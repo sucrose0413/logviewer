@@ -1,11 +1,10 @@
-# Analogy Log Viewer    <img src="./Assets/Analogy2.png" align="right" width="155px" height="155px">
+# Analogy Log Viewer   ![.NET Core Desktop](https://github.com/Analogy-LogViewer/Analogy.LogViewer/workflows/.NET%20Core%20Desktop/badge.svg) [Discord](https://discord.gg/BTjavaUDR9) ![Discord](https://img.shields.io/discord/762688735594676235?style=plastic)
+  <img src="./Assets/Analogy2.png" align="right" width="155px" height="155px">
 
 <p align="center">
     
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/9ff37aaf309b45f0bb2156465eb47b91)](https://app.codacy.com/gh/Analogy-LogViewer/Analogy.LogViewer?utm_source=github.com&utm_medium=referral&utm_content=Analogy-LogViewer/Analogy.LogViewer&utm_campaign=Badge_Grade)
 [![Gitter](https://badges.gitter.im/Analogy-LogViewer/community.svg)](https://gitter.im/Analogy-LogViewer/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge) 
-[![Build Status](https://dev.azure.com/Analogy-LogViewer/Analogy%20Log%20Viewer/_apis/build/status/Analogy-LogViewer.Analogy.LogViewer?branchName=master)](https://dev.azure.com/Analogy-LogViewer/Analogy%20Log%20Viewer/_build/latest?definitionId=1&branchName=master)  ![.NET Core Desktop](https://github.com/Analogy-LogViewer/Analogy.LogViewer/workflows/.NET%20Core%20Desktop/badge.svg)
-[![Dependabot Status](https://api.dependabot.com/badges/status?host=github&repo=Analogy-LogViewer/Analogy.LogViewer)](https://dependabot.com)
 <a href="https://github.com/Analogy-LogViewer/Analogy.LogViewer/issues">
     <img src="https://img.shields.io/github/issues/Analogy-LogViewer/Analogy.LogViewer"  alt="Issues" />
 </a>
@@ -16,12 +15,13 @@
 <a href="https://github.com/Analogy-LogViewer/Analogy.LogViewer/releases">
     <img src="https://img.shields.io/github/v/release/Analogy-LogViewer/Analogy.LogViewer"  alt="Latest Release" />
 </a>
-<a href="https://github.com/Analogy-LogViewer/Analogy.LogViewer/compare/V4.2.11...master">
+<a href="https://github.com/Analogy-LogViewer/Analogy.LogViewer/compare/V4.4.0...master">
     <img src="https://img.shields.io/github/commits-since/Analogy-LogViewer/Analogy.LogViewer/latest"  alt="Commits Since Latest Release"/>
 </a>
 </p>
 
 A log viewer that can parse log files and stream logs from C#, Python, Java and others.
+You can also implement your own parsers or request to add new parsers for other logs
 
 ## Content
 [General](https://github.com/Analogy-LogViewer/Analogy.LogViewer#general)
@@ -151,6 +151,8 @@ Along with custom Data Providers you can create extensions for existing provider
 
 The example data provider has example for this (you need to enable the extension in the extensions tab in the user settings). 
 
+Discuss about the extension here: [Extension Disscussion](https://github.com/Analogy-LogViewer/Analogy.LogViewer/discussions/770)
+
 ## Plotting
 
 Along with custom Data Providers you can create Plots of arbitrary data by implementing the ```IAnalogyPlotting ``` Interface:
@@ -173,6 +175,13 @@ Along with custom Data Providers you can create Plots of arbitrary data by imple
 ```
 The example data provider has example for this:
 ![Example plot](Assets/plottingExample.jpg)
+
+You can select the chart's layout from the UI:
+![horizontal plot](Assets/plottingMultiPaneExample.jpg)
+![vertical plot](Assets/plottingMultiPaneExample2.jpg)
+
+Discuss about the plotting here: [Extension Disscussion](https://github.com/Analogy-LogViewer/Analogy.LogViewer/discussions/772)
+
 ## Logs Analysis and Visualizers
 
 The application has some analyzers and visualization.

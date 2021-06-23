@@ -1,12 +1,16 @@
-﻿using Analogy.DataProviders;
+﻿
+using Analogy.DataProviders;
 using Analogy.DataTypes;
 using Analogy.Interfaces;
+using Analogy.Interfaces.DataTypes;
 using Analogy.Interfaces.Factories;
 using Analogy.Managers;
 using Analogy.Properties;
 using Analogy.UserControls;
+using DevExpress.Utils;
 using DevExpress.Utils.Drawing.Helpers;
 using DevExpress.XtraBars;
+using DevExpress.XtraBars.Alerter;
 using DevExpress.XtraBars.Docking;
 using DevExpress.XtraBars.Ribbon;
 using DevExpress.XtraEditors;
@@ -22,15 +26,12 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using DevExpress.Utils;
 
 namespace Analogy.Forms
 {
     public partial class MainForm : RibbonForm
     {
-
         const int WM_COPYDATA = 0x004A;
-
         [DllImport("user32", EntryPoint = "SendMessageA")]
         private static extern int SendMessage(IntPtr Hwnd, int wMsg, IntPtr wParam, IntPtr lParam);
         [DllImport("user32.dll")]
@@ -125,7 +126,41 @@ namespace Analogy.Forms
             {
                 return;
             }
+            NotificationManager.Instance.OnNewNotification += (s, notification) =>
+             {
+                 AlertInfo info = new AlertInfo(notification.Title, notification.Message, notification.SmallImage);
+                 AlertControl ac = new AlertControl(this.components)
+                 {
+                     AutoFormDelay = notification.DurationSeconds * 1000
+                 };
+                 ac.AutoHeight = true;
+                 if (notification.ActionOnClick != null)
+                 {
 
+                     AlertButton btn1 = new AlertButton(Resources.Delete_16x16);
+                     btn1.Hint = "OK";
+                     btn1.Name = "NotificationActionButton";
+                     ac.Buttons.Add(btn1);
+                     ac.ButtonClick += (sender, arg) =>
+                     {
+                         if (arg.ButtonName == btn1.Name)
+                         {
+                             try
+                             {
+                                 notification.ActionOnClick?.Invoke();
+
+                             }
+                             catch (Exception exception)
+                             {
+                                 XtraMessageBox.Show($"Error during notification action: {exception}", "Error",
+                                     MessageBoxButtons.OK);
+
+                             }
+                         }
+                     };
+                 }
+                 ac.Show(this.ParentForm, info);
+             };
             if (settings.AnalogyPosition.RememberLastPosition || settings.AnalogyPosition.WindowState != FormWindowState.Minimized)
             {
                 WindowState = settings.AnalogyPosition.WindowState;
@@ -166,10 +201,17 @@ namespace Analogy.Forms
             await FactoriesManager.Instance.AddExternalDataSources();
             PopulateGlobalTools();
             LoadStartupExtensions();
-            CreateDataSources();
 
+
+            //Create all other DataSources
+            foreach (FactoryContainer factory in FactoriesManager.Instance.Factories
+                .Where(factory => !FactoriesManager.Instance.IsBuiltInFactory(factory.Factory) &&
+                                  factory.FactorySetting.Status != DataProviderFactoryStatus.Disabled))
+            {
+                CreateDataSource(factory, 3);
+            }
             //set Default page:
-            Guid defaultPage = new Guid(settings.InitialSelectedDataProvider);
+            Guid defaultPage = settings.InitialSelectedDataProvider;
             if (Mapping.ContainsKey(defaultPage))
             {
                 ribbonControlMain.SelectedPage = Mapping[defaultPage];
@@ -207,18 +249,25 @@ namespace Analogy.Forms
                 btnErrors.Visibility = BarItemVisibility.Always;
             }
 
-            var (_, release) = await UpdateManager.Instance.CheckVersion(false);
-            if (release?.TagName != null && UpdateManager.Instance.NewestVersion != null)
+            if (!AnalogyNonPersistSettings.Instance.UpdateAreDisabled)
             {
-                bbtnCheckUpdates.Caption = "Latest Version: " + UpdateManager.Instance.NewestVersion.ToString();
-                if (UpdateManager.Instance.NewVersionExist)
+                var (_, release) = await UpdateManager.Instance.CheckVersion(false);
+                if (release?.TagName != null && UpdateManager.Instance.NewestVersion != null)
                 {
-                    bbtnCheckUpdates.Appearance.BackColor = Color.GreenYellow;
-                    bbtnCheckUpdates.Caption = "New Version Available: " + UpdateManager.Instance.NewestVersion.ToString();
+                    bbtnCheckUpdates.Caption = "Latest Version: " + UpdateManager.Instance.NewestVersion.ToString();
+                    if (UpdateManager.Instance.NewVersionExist)
+                    {
+                        bbtnCheckUpdates.Appearance.BackColor = Color.GreenYellow;
+                        bbtnCheckUpdates.Caption =
+                            "New Version Available: " + UpdateManager.Instance.NewestVersion.ToString();
 
+                    }
                 }
             }
-
+            else
+            {
+                AnalogyLogManager.Instance.LogWarning("Update is disabled", nameof(MainForm));
+            }
             if (settings.ShowWhatIsNewAtStartup)
             {
                 WhatsNewForm f = new WhatsNewForm();
@@ -240,7 +289,7 @@ namespace Analogy.Forms
                 {
                     foreach (IAnalogyCustomAction action in actionFactory.Actions)
                     {
-                        if (action.Type == AnalogyCustomActionType.BelongsToProvider)
+                        if (action.Type != AnalogyCustomActionType.Global)
                         {
                             continue;
                         }
@@ -260,44 +309,100 @@ namespace Analogy.Forms
 
         private void SetupEventHandlers()
         {
-            ILogWindow GetLogWindows(Control mainControl)
+            bbiPayPal.ItemClick += (s, e) =>
             {
-                while (true)
-                {
-                    if (mainControl is ILogWindow logWindow)
-                    {
-                        return logWindow;
-                    }
+                Utils.OpenLink("https://www.paypal.me/liorbanai");
+            };
+            bbiBinance.ItemClick += (s, e) =>
+            {
+                Utils.OpenLink("https://www.binance.com/en/register?ref=V8P114PE");
+            };
+            dockManager1.ClosingPanel += (s, e) =>
+            {
+                var workspace = Utils.GetLogWindows<IAnalogyWorkspace>(this);
+                workspace?.SaveCurrentWorkspace();
+            };
+            bbtnSponsorOpenCollection.ItemClick +=
+                (s, e) => Utils.OpenLink("https://opencollective.com/analogy-log-viewer");
 
-                    if (mainControl is SplitContainer split)
-                    {
-                        var log1 = GetLogWindows(split.Panel1);
-                        if (log1 != null)
-                        {
-                            return log1;
-                        }
+            #region  main menu
 
-                        mainControl = split.Panel2;
-                        continue;
-                    }
+            btnSettingsUpdate.ItemClick += (s, e) =>
+            {
+                ApplicationSettingsForm user = new ApplicationSettingsForm("Updates");
+                user.ShowDialog(this);
+            };
 
-                    for (int i = 0; i < mainControl.Controls.Count; i++)
-                    {
-                        var control = mainControl.Controls[i];
-                        if (control is ILogWindow logWindow2)
-                        {
-                            return logWindow2;
-                        }
+            bbiSettingsExtensions.ItemClick += (s, e) =>
+            {
 
-                        if (GetLogWindows(control) is ILogWindow log)
-                        {
-                            return log;
-                        }
-                    }
+                ApplicationSettingsForm user = new ApplicationSettingsForm("Extensions");
+                user.ShowDialog(this);
+            };
 
-                    return null;
-                }
-            }
+            btnSettingsDebugging.ItemClick += (s, e) =>
+            {
+                ApplicationSettingsForm user = new ApplicationSettingsForm("Debugging");
+                user.ShowDialog(this);
+            };
+
+            btnShortcuts.ItemClick += (s, e) =>
+            {
+                ApplicationSettingsForm user = new ApplicationSettingsForm("Shortcuts");
+                user.ShowDialog(this);
+            };
+
+            bbiDonation.ItemClick += (s, e) =>
+            {
+                ApplicationSettingsForm user = new ApplicationSettingsForm("Donations");
+                user.ShowDialog(this);
+            };
+            btnApplicationSettings.ItemClick += (s, e) =>
+            {
+                ApplicationSettingsForm user = new ApplicationSettingsForm("Application Settings");
+                user.ShowDialog(this);
+            };
+            btnApplicationUISettings.ItemClick += (s, e) =>
+            {
+                ApplicationSettingsForm user = new ApplicationSettingsForm("Application UI Settings");
+                user.ShowDialog(this);
+            };
+            btnFiltering.ItemClick += (s, e) =>
+            {
+                ApplicationSettingsForm user = new ApplicationSettingsForm("Messages Filtering");
+                user.ShowDialog(this);
+            };
+            btnMessageColumnsLayoutSettings.ItemClick += (s, e) =>
+            {
+                ApplicationSettingsForm user = new ApplicationSettingsForm("Messages Layout");
+                user.ShowDialog(this);
+            };
+            btnColorsSettings.ItemClick += (s, e) =>
+            {
+                ApplicationSettingsForm user = new ApplicationSettingsForm("Color Settings");
+                user.ShowDialog(this);
+            };
+            btnColorHighlightSettings.ItemClick += (s, e) =>
+            {
+                ApplicationSettingsForm user = new ApplicationSettingsForm("Color Highlighting");
+                user.ShowDialog(this);
+            };
+            btnPreDefinedQueries.ItemClick += (s, e) =>
+            {
+                ApplicationSettingsForm user = new ApplicationSettingsForm("Predefined queries");
+                user.ShowDialog(this);
+            };
+            btnPreDefinedQueries.ItemClick += (s, e) =>
+            {
+                ApplicationSettingsForm user = new ApplicationSettingsForm("Donations");
+                user.ShowDialog(this);
+            };
+            btnDataProvidersSettings.ItemClick += (s, e) =>
+            {
+                ApplicationSettingsForm user = new ApplicationSettingsForm("Data Provider Settings");
+                user.ShowDialog(this);
+            };
+            #endregion
 
             settings.OnRibbonControlStyleChanged += (s, e) => ribbonControlMain.CommandLayout = e;
             bbtnReportIssueOrRequest.ItemClick += (_, __) =>
@@ -307,7 +412,7 @@ namespace Analogy.Forms
 
             bbtnCombineOpenLogs.ItemClick += (s, e) =>
             {
-                var items = dockManager1.Panels.Select(p => (p.Text, GetLogWindows(p))).Where(l => l.Item2 != null)
+                var items = dockManager1.Panels.Select(p => (p.Text, Utils.GetLogWindows<ILogWindow>(p))).Where(l => l.Item2 != null)
                     .ToList();
                 var openLogs = new OpenWindows(items);
                 openLogs.Show(this);
@@ -516,7 +621,7 @@ namespace Analogy.Forms
 
         private void bbtnItemSettings_ItemClick(object sender, ItemClickEventArgs e)
         {
-            UserSettingsForm user = new UserSettingsForm();
+            ApplicationSettingsForm user = new ApplicationSettingsForm();
             user.ShowDialog(this);
         }
 
@@ -553,16 +658,6 @@ namespace Analogy.Forms
         {
         }
 
-        private void CreateDataSources()
-        {
-            foreach (FactoryContainer factory in FactoriesManager.Instance.Factories
-                .Where(factory => !FactoriesManager.Instance.IsBuiltInFactory(factory.Factory) &&
-                                  factory.FactorySetting.Status != DataProviderFactoryStatus.Disabled))
-            {
-                CreateDataSource(factory, 3);
-            }
-
-        }
 
         private void CreateDataSource(FactoryContainer fc, int position)
         {
@@ -580,14 +675,13 @@ namespace Analogy.Forms
                 ribbonPage.ImageOptions.Image = ribbonPageImage;
             }
 
-            AddGraphPlotter(ribbonPage, fc.GraphPlotter);
             var dataSourceFactory = fc.DataProvidersFactories;
 
             foreach (var dataProvidersFactory in dataSourceFactory)
             {
                 if (!string.IsNullOrEmpty(dataProvidersFactory.Title))
                 {
-                    CreateDataSourceRibbonGroup(dataProvidersFactory, ribbonPage);
+                    CreateOnlineAndOfflineProviders(fc.Factory, dataProvidersFactory, ribbonPage);
                 }
             }
 
@@ -623,6 +717,8 @@ namespace Analogy.Forms
                 }
             }
 
+            AddUserControls(ribbonPage, fc.UserControlsFactories);
+            AddGraphPlotter(ribbonPage, fc.GraphPlotter);
             AddFactorySettings(fc, ribbonPage);
             AddAbout(fc, ribbonPage);
         }
@@ -671,14 +767,91 @@ namespace Analogy.Forms
             }
             ribbonPage.Groups.Add(groupSettings);
         }
-        private void CreateDataSourceRibbonGroup(IAnalogyDataProvidersFactory dataSourceFactory, RibbonPage ribbonPage)
+        private void CreateOnlineAndOfflineProviders(IAnalogyFactory factory, IAnalogyDataProvidersFactory dataSourceFactory, RibbonPage ribbonPage)
         {
             RibbonPageGroup ribbonPageGroup = new RibbonPageGroup($"Data Provider: {dataSourceFactory.Title}") { AllowTextClipping = false };
             ribbonPage.Groups.Add(ribbonPageGroup);
 
-            AddFlatRealTimeDataSource(ribbonPage, dataSourceFactory, ribbonPageGroup);
-            AddSingleDataSources(ribbonPage, dataSourceFactory, ribbonPageGroup);
-            AddOfflineDataSource(ribbonPage, dataSourceFactory, ribbonPageGroup);
+            AddFlatRealTimeDataSource(factory, ribbonPage, dataSourceFactory, ribbonPageGroup);
+            AddSingleDataSources(factory, ribbonPage, dataSourceFactory, ribbonPageGroup);
+            AddOfflineDataSource(factory, ribbonPage, dataSourceFactory, ribbonPageGroup);
+        }
+
+        private void AddUserControls(RibbonPage ribbonPage, List<IAnalogyCustomUserControlsFactory> userControls)
+        {
+
+            if (userControls.Count == 0)
+            {
+                return;
+            }
+
+
+            foreach (var userControlFactory in userControls)
+            {
+                RibbonPageGroup ribbonPageGroup = new RibbonPageGroup(userControlFactory.Title)
+                { AllowTextClipping = false };
+                ribbonPage.Groups.Add(ribbonPageGroup);
+                foreach (var userControl in userControlFactory.UserControls)
+                {
+                    BarButtonItem userControlBtn = new BarButtonItem();
+                    ribbonPageGroup.ItemLinks.Add(userControlBtn);
+                    userControlBtn.ImageOptions.Image = userControl.SmallImage ?? Resources.userControls16x16;
+                    userControlBtn.ImageOptions.LargeImage = userControl.LargeImage ?? Resources.UserControls32x32;
+                    userControlBtn.RibbonStyle = RibbonItemStyles.All;
+                    userControlBtn.Caption = userControl.Title;
+                    if (userControl.ToolTip != null)
+                    {
+                        SuperToolTip toolTip = new SuperToolTip();
+                        // Create an object to initialize the SuperToolTip.
+                        SuperToolTipSetupArgs args = new SuperToolTipSetupArgs();
+                        args.Title.Text = userControl.ToolTip.Title;
+                        args.Contents.Text = userControl.ToolTip.Content;
+                         args.Contents.Image = userControl.ToolTip.SmallImage;
+                        toolTip.Setup(args);
+                        userControlBtn.SuperTip = toolTip;
+                    }
+                    async Task<bool> OpenUserControl()
+                    {
+                        userControlBtn.Enabled = false;
+                        openedWindows++;
+                        //plotterBtn.ImageOptions.Image = imageSmallOnline ?? Resources.Database_on;
+                        var page = dockManager1.AddPanel(DockingStyle.Float);
+                        await userControl.InitializeUserControl(page, AnalogyLogger.Instance);
+                        page.DockedAsTabbedDocument = true;
+                        page.Tag = ribbonPage;
+                        page.Controls.Add(userControl.UserControl);
+                        ribbonControlMain.SelectedPage = ribbonPage;
+                        userControl.UserControl.Dock = DockStyle.Fill;
+                        page.Text = $"{userControl.Title} #{openedWindows}";
+                        dockManager1.ActivePanel = page;
+                        async void OnXtcLogsOnControlRemoved(object sender, DockPanelEventArgs arg)
+                        {
+                            if (arg.Panel == page)
+                            {
+                                try
+                                {
+                                    await userControl.UserControlRemoved();
+                                }
+                                catch (Exception e)
+                                {
+                                    AnalogyLogManager.Instance.LogError(
+                                        "Error during call to remove user control: " + e,
+                                        nameof(OnXtcLogsOnControlRemoved));
+                                }
+                                finally
+                                {
+                                    dockManager1.ClosedPanel -= OnXtcLogsOnControlRemoved;
+                                }
+                            }
+                        }
+
+                        dockManager1.ClosedPanel += OnXtcLogsOnControlRemoved;
+                        userControlBtn.Enabled = true;
+                        return true;
+                    }
+                    userControlBtn.ItemClick += async (s, be) => await OpenUserControl();
+                }
+            }
         }
 
         private void AddGraphPlotter(RibbonPage ribbonPage, List<IAnalogyPlotting> graphPlotters)
@@ -689,7 +862,7 @@ namespace Analogy.Forms
                 return;
             }
             RibbonPageGroup ribbonPageGroup = new RibbonPageGroup("Graph Plotter") { AllowTextClipping = false };
-            ribbonPage.Groups.Insert(0, ribbonPageGroup);
+            ribbonPage.Groups.Add(ribbonPageGroup);
 
             foreach (var plot in graphPlotters)
             {
@@ -752,7 +925,7 @@ namespace Analogy.Forms
             }
         }
 
-        private void AddFlatRealTimeDataSource(RibbonPage ribbonPage, IAnalogyDataProvidersFactory dataSourceFactory, RibbonPageGroup group)
+        private void AddFlatRealTimeDataSource(IAnalogyFactory primaryFactory, RibbonPage ribbonPage, IAnalogyDataProvidersFactory dataSourceFactory, RibbonPageGroup group)
         {
             var realTimes = dataSourceFactory.DataProviders.Where(f => f is IAnalogyRealTimeDataProvider)
                 .Cast<IAnalogyRealTimeDataProvider>().ToList();
@@ -1039,8 +1212,7 @@ namespace Analogy.Forms
             }
         }
 
-        private void AddSingleDataSources(RibbonPage ribbonPage, IAnalogyDataProvidersFactory dataSourceFactory,
-            RibbonPageGroup group)
+        private void AddSingleDataSources(IAnalogyFactory primaryFactory, RibbonPage ribbonPage, IAnalogyDataProvidersFactory dataSourceFactory, RibbonPageGroup group)
         {
             var singles = dataSourceFactory.DataProviders.Where(f => f is IAnalogySingleDataProvider ||
                                                                       f is IAnalogySingleFileDataProvider).ToList();
@@ -1055,9 +1227,9 @@ namespace Analogy.Forms
                 singleBtn.ImageOptions.LargeImage = imageLarge ?? Resources.Single32x32;
                 singleBtn.ImageOptions.Image = imageSmall ?? Resources.Single16x16;
                 singleBtn.RibbonStyle = RibbonItemStyles.All;
-                singleBtn.Caption = "Single provider" + (!string.IsNullOrEmpty(single.OptionalTitle)
-                    ? $" - {single.OptionalTitle}"
-                    : string.Empty);
+                singleBtn.Caption = !string.IsNullOrEmpty(single.OptionalTitle)
+                    ? $"{single.OptionalTitle}"
+                    : "Single Data Provider";
                 if (single.ToolTip != null)
                 {
                     SuperToolTip toolTip = new SuperToolTip();
@@ -1096,7 +1268,7 @@ namespace Analogy.Forms
         }
 
 
-        private void AddOfflineDataSource(RibbonPage ribbonPage, IAnalogyDataProvidersFactory factory, RibbonPageGroup group)
+        private void AddOfflineDataSource(IAnalogyFactory primaryFactory, RibbonPage ribbonPage, IAnalogyDataProvidersFactory factory, RibbonPageGroup group)
         {
 
             var offlineProviders = factory.DataProviders.Where(f => f is IAnalogyOfflineDataProvider)
@@ -1116,21 +1288,23 @@ namespace Analogy.Forms
                 RibbonPageGroup groupOfflineFileTools = new RibbonPageGroup($"Tools{optionalText}");
                 groupOfflineFileTools.AllowTextClipping = false;
                 ribbonPage.Groups.Add(groupOfflineFileTools);
-                AddSingleOfflineDataSource(ribbonPage, offlineAnalogy, factory.FactoryId, factory.Title, group, groupOfflineFileTools);
+                AddSingleOfflineDataSource(primaryFactory, ribbonPage, offlineAnalogy, factory, group, groupOfflineFileTools);
             }
             else
             {
-                AddMultiplesOfflineDataSource(ribbonPage, offlineProviders, factory.FactoryId, factory.Title, group);
+                AddMultiplesOfflineDataSource(primaryFactory, ribbonPage, offlineProviders, factory, group);
             }
 
         }
 
-        private void AddMultiplesOfflineDataSource(RibbonPage ribbonPage,
-            List<IAnalogyOfflineDataProvider> offlineProviders, Guid factoryId, string factoryTitle, RibbonPageGroup group)
+        private void AddMultiplesOfflineDataSource(IAnalogyFactory primaryFactory, RibbonPage ribbonPage,
+            List<IAnalogyOfflineDataProvider> offlineProviders, IAnalogyDataProvidersFactory factory, RibbonPageGroup group)
         {
 
+            Guid factoryId = factory.FactoryId;
+            string factoryTitle = factory.Title;
             FactoryContainer container = FactoriesManager.Instance.GetFactoryContainer(factoryId);
-            IAnalogyImages images = container?.Images?.FirstOrDefault();
+            IAnalogyImages? images = container?.Images?.FirstOrDefault();
 
 
 
@@ -1219,8 +1393,8 @@ namespace Analogy.Forms
 
             foreach (var dataProvider in offlineProviders)
             {
-                string directory = (!string.IsNullOrEmpty(dataProvider.InitialFolderFullPath) &&
-                                   Directory.Exists(dataProvider.InitialFolderFullPath))
+                string? directory = (!string.IsNullOrEmpty(dataProvider.InitialFolderFullPath) &&
+                                     Directory.Exists(dataProvider.InitialFolderFullPath))
                     ? dataProvider.InitialFolderFullPath
                     : Environment.CurrentDirectory;
                 //add local folder button:
@@ -1231,27 +1405,6 @@ namespace Analogy.Forms
                 };
                 folderBar.AddItem(btn);
             }
-            //todo: add for multiples implementations
-
-            ////add local folder button:
-            //BarButtonItem localfolder = new BarButtonItem();
-            //localfolder.Caption = "Open Folder Selection";
-            //localfolder.RibbonStyle = RibbonItemStyles.All;
-            //group.ItemLinks.Add(localfolder);
-            //localfolder.ImageOptions.Image = Resources.OpenFolder_16x16;
-            //localfolder.ImageOptions.LargeImage = Resources.OpenFolder_32x32;
-            //localfolder.ItemClick += (sender, e) =>
-            //{
-            //    using (var dialog = new CommonOpenFileDialog())
-            //    {
-            //        dialog.InitialDirectory = Environment.CurrentDirectory;
-            //        dialog.IsFolderPicker = true;
-            //        if (dialog.ShowDialog() == CommonFileDialogResult.Ok)
-            //        {
-            //            OpenOffline(title, dialog.FileName);
-            //        }
-            //    }
-            //};
 
             //add recent folders
             //recent bar
@@ -1301,7 +1454,7 @@ namespace Analogy.Forms
                         {
                             OpenFileDialog openFileDialog1 = new OpenFileDialog
                             {
-                                Filter = GetOpenFilter(dataProvider.FileOpenDialogFilters),
+                                Filter = Utils.GetOpenFilter(dataProvider.FileOpenDialogFilters),
                                 Title = @"Open Files",
                                 Multiselect = true
                             };
@@ -1315,13 +1468,25 @@ namespace Analogy.Forms
                         };
                         openFiles.AddItem(btnOpenFile);
                     }
+                    else
+                    {
+
+                        IAnalogyNotification notification = new AnalogyNotification(factoryId,
+                            "Missing File Open Dialog Filter",
+                            $"{factoryTitle} has offline data provider without File Open Dialog Filter.{Environment.NewLine}You can set a filter in the data provider settings or report this to the developer.{Environment.NewLine}Filter format example: 'log files (*.log)|*.log|clef files (*.clef)|*.clef'"
+                            , AnalogyLogLevel.Error, primaryFactory.LargeImage, 5, null);
+                        NotificationManager.Instance.RaiseNotification(notification, true);
+                    }
                 }
 
 
 
                 //add Open Pooled file entry
                 BarSubItem filePoolingBtn = new BarSubItem();
-                filePoolingBtn.Caption = "File Pooling";
+                string caption="File Pooling (Monitoring)";
+                filePoolingBtn.Caption = caption;
+                filePoolingBtn.SuperTip =
+                    Utils.GetSuperTip(caption, "Monitor file for changes in real time and reload the file automatically");
                 group.ItemLinks.Add(filePoolingBtn);
                 filePoolingBtn.ImageOptions.Image = images?.GetSmallFilePoolingImage(factoryId) ?? Resources.FilePooling_16x16;
                 filePoolingBtn.ImageOptions.LargeImage = images?.GetLargeFilePoolingImage(factoryId) ?? Resources.FilePooling_32x32;
@@ -1444,32 +1609,12 @@ namespace Analogy.Forms
             }
         }
 
-        private string GetOpenFilter(string openFilter)
-        {
-            if (!settings.EnableCompressedArchives)
-            {
-                return openFilter;
-            }
-            //if (openFilter.Contains("*.gz") || openFilter.Contains("*.zip")) return openFilter;
-            //string compressedFilter = "|Compressed archives (*.gz, *.zip)|*.gz;*.zip";
-            //return openFilter + compressedFilter;
-            if (!openFilter.Contains("*.zip", StringComparison.InvariantCultureIgnoreCase))
-            {
-                string compressedFilter = "|Compressed Zip Archive (*.zip)|*.zip";
-                openFilter = openFilter + compressedFilter;
-            }
-            if (!openFilter.Contains("*.gz", StringComparison.InvariantCultureIgnoreCase))
-            {
-                string compressedFilter = "|Compressed Gzip Archive (*.gz)|*.gz";
-                openFilter = openFilter + compressedFilter;
-            }
 
-            return openFilter;
-        }
-
-        private void AddSingleOfflineDataSource(RibbonPage ribbonPage, IAnalogyOfflineDataProvider offlineAnalogy,
-          Guid factoryId, string title, RibbonPageGroup group, RibbonPageGroup groupOfflineFileTools)
+        private void AddSingleOfflineDataSource(IAnalogyFactory primaryFactory, RibbonPage ribbonPage, IAnalogyOfflineDataProvider offlineAnalogy,
+            IAnalogyDataProvidersFactory factory, RibbonPageGroup group, RibbonPageGroup groupOfflineFileTools)
         {
+            Guid factoryId = factory.FactoryId;
+            string title = factory.Title;
             #region actions
             void OpenOffline(string titleOfDataSource, string initialFolder, string[] files = null)
             {
@@ -1561,7 +1706,7 @@ namespace Analogy.Forms
             localfolder.ImageOptions.LargeImage = images?.GetLargeOpenFolderImage(factoryId) ?? Resources.OpenFolder_32x32;
             localfolder.ItemClick += (sender, e) =>
             {
-#if NETCOREAPP3_1
+#if NETCOREAPP3_1 || NET
                 using (var folderBrowserDialog = new FolderBrowserDialog { ShowNewFolderButton = false })
                 {
                     folderBrowserDialog.SelectedPath = preDefinedFolderExist ? offlineAnalogy.InitialFolderFullPath : Environment.CurrentDirectory;
@@ -1631,7 +1776,7 @@ namespace Analogy.Forms
                 {
                     OpenFileDialog openFileDialog1 = new OpenFileDialog
                     {
-                        Filter = GetOpenFilter(offlineAnalogy.FileOpenDialogFilters),
+                        Filter = Utils.GetOpenFilter(offlineAnalogy.FileOpenDialogFilters),
                         Title = @"Open Files",
                         Multiselect = true
                     };
@@ -1645,7 +1790,10 @@ namespace Analogy.Forms
 
                 //add Open Pooled file entry
                 BarButtonItem filePoolingBtn = new BarButtonItem();
-                filePoolingBtn.Caption = "File Pooling";
+                string caption = "File Pooling (Monitoring)";
+                filePoolingBtn.Caption = caption;
+                filePoolingBtn.SuperTip =
+                    Utils.GetSuperTip(caption, "Monitor file for changes in real time and reload the file automatically");
                 group.ItemLinks.Add(filePoolingBtn);
                 filePoolingBtn.ImageOptions.Image = images?.GetSmallFilePoolingImage(factoryId) ?? Resources.FilePooling_16x16;
                 filePoolingBtn.ImageOptions.LargeImage = images?.GetLargeFilePoolingImage(factoryId) ?? Resources.FilePooling_32x32;
@@ -1666,6 +1814,15 @@ namespace Analogy.Forms
                     }
 
                 };
+            }
+            else
+            {
+
+                IAnalogyNotification notification = new AnalogyNotification(factoryId,
+                    "Missing File Open Dialog Filter",
+                    $"{title} has offline data provider without File Open Dialog Filter.{Environment.NewLine}You can set a filter in the data provider settings or report this to the developer.{Environment.NewLine}Filter format example: 'log files (*.log)|*.log|clef files (*.clef)|*.clef'"
+                    , AnalogyLogLevel.Error, primaryFactory.LargeImage, 5, null);
+                NotificationManager.Instance.RaiseNotification(notification, true);
             }
 
             //add recent
@@ -1875,15 +2032,7 @@ namespace Analogy.Forms
         {
             tmrStatusUpdates.Stop();
             bsiMemoryUsage.Caption = Process.GetCurrentProcess().PrivateMemorySize64 / 1024 / 1024 + " [MB]";
-            if (settings.IdleMode)
-            {
-                bsiIdleMessage.Caption =
-                    $"Idle mode is on. User idle: {Utils.IdleTime():hh\\:mm\\:ss}. Missed messages: {PagingManager.TotalMissedMessages}";
-            }
-            else
-            {
-                bsiIdleMessage.Caption = "Idle mode is off";
-            }
+            bsiIdleMessage.Caption = settings.IdleMode ? $"Idle mode is on. User idle: {Utils.IdleTime():hh\\:mm\\:ss}. Missed messages: {PagingManager.TotalMissedMessages}" : "Idle mode is off";
 
             tmrStatusUpdates.Start();
         }
@@ -1979,79 +2128,6 @@ namespace Analogy.Forms
         {
             UpdateForm update = new UpdateForm();
             update.Show(this);
-        }
-
-        private void btnApplicationSettings_ItemClick(object sender, ItemClickEventArgs e)
-        {
-            UserSettingsForm user = new UserSettingsForm(0);
-            user.ShowDialog(this);
-        }
-
-        private void btnFiltering_ItemClick(object sender, ItemClickEventArgs e)
-        {
-            UserSettingsForm user = new UserSettingsForm(1);
-            user.ShowDialog(this);
-        }
-
-        private void btnPreDefinedQueries_ItemClick(object sender, ItemClickEventArgs e)
-        {
-            UserSettingsForm user = new UserSettingsForm(2);
-            user.ShowDialog(this);
-        }
-
-        private void btnLookAndFeel_ItemClick(object sender, ItemClickEventArgs e)
-        {
-            UserSettingsForm user = new UserSettingsForm(3);
-            user.ShowDialog(this);
-        }
-
-        private void btnShortcuts_ItemClick(object sender, ItemClickEventArgs e)
-        {
-            UserSettingsForm user = new UserSettingsForm(4);
-            user.ShowDialog(this);
-        }
-
-        private void btnMRU_ItemClick(object sender, ItemClickEventArgs e)
-        {
-            UserSettingsForm user = new UserSettingsForm(5);
-            user.ShowDialog(this);
-        }
-
-        private void btnResourcesUsage_ItemClick(object sender, ItemClickEventArgs e)
-        {
-            UserSettingsForm user = new UserSettingsForm(6);
-            user.ShowDialog(this);
-        }
-
-        private void btnDataProvidersSettings_ItemClick(object sender, ItemClickEventArgs e)
-        {
-            UserSettingsForm user = new UserSettingsForm(7);
-            user.ShowDialog(this);
-        }
-
-        private void btnCustomDataProvidersSettings_ItemClick(object sender, ItemClickEventArgs e)
-        {
-            UserSettingsDataProvidersForm user = new UserSettingsDataProvidersForm();
-            user.ShowDialog(this);
-        }
-
-        private void bbiSettingsExtensions_ItemClick(object sender, ItemClickEventArgs e)
-        {
-            UserSettingsForm user = new UserSettingsForm(8);
-            user.ShowDialog(this);
-        }
-
-
-        private void btnSettingsUpdate_ItemClick(object sender, ItemClickEventArgs e)
-        {
-            UserSettingsForm user = new UserSettingsForm(9);
-            user.ShowDialog(this);
-        }
-
-        private void btnSettingsDebugging_ItemClick(object sender, ItemClickEventArgs e)
-        {
-            UserSettingsForm user = new UserSettingsForm(10);
-            user.ShowDialog(this);
         }
 
         private void bbtnDataProvidersUpdates_ItemClick(object sender, ItemClickEventArgs e)

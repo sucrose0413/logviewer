@@ -5,6 +5,7 @@ using DevExpress.LookAndFeel;
 using DevExpress.XtraBars.Ribbon;
 using DevExpress.XtraEditors;
 using DevExpress.XtraEditors.Controls;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -17,6 +18,7 @@ using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
+using DevExpress.Utils;
 
 namespace Analogy
 {
@@ -251,45 +253,13 @@ namespace Analogy
             Regex regex = new Regex(regexString, RegexOptions.Compiled | RegexOptions.IgnoreCase);
             return regex;
         }
-        //public static async Task<(bool newData, T result)> GetAsync<T>(string uri, string token, DateTime lastModified)
-        //{
-        //    try
-        //    {
-        //        Uri myUri = new Uri(uri);
-        //        HttpWebRequest myHttpWebRequest = (HttpWebRequest)WebRequest.Create(myUri);
-        //        myHttpWebRequest.Accept = "application/json";
-        //        myHttpWebRequest.UserAgent = "Analogy";
-        //        if (!string.IsNullOrEmpty(token))
-        //            myHttpWebRequest.Headers.Add(HttpRequestHeader.Authorization, $"Token {token}");
-
-        //        myHttpWebRequest.IfModifiedSince = lastModified;
-
-        //        HttpWebResponse myHttpWebResponse = (HttpWebResponse)await myHttpWebRequest.GetResponseAsync();
-        //        if (myHttpWebResponse.StatusCode == HttpStatusCode.NotModified)
-        //            return (false, default)!;
-
-        //        using (var reader = new System.IO.StreamReader(myHttpWebResponse.GetResponseStream()))
-        //        {
-        //            string responseText = await reader.ReadToEndAsync();
-        //            return (true, JsonConvert.DeserializeObject<T>(responseText));
-        //        }
-        //    }
-        //    catch (WebException e) when (((HttpWebResponse)e.Response).StatusCode == HttpStatusCode.NotModified)
-        //    {
-        //        return (false, default)!;
-        //    }
-        //    catch (Exception)
-        //    {
-        //        return (false, default)!;
-        //    }
-        //}
-
+  
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static DataRow CreateRow(DataTable table, AnalogyLogMessage message, string dataSource, bool checkAdditionalInformation)
         {
             var dtr = table.NewRow();
             dtr.BeginEdit();
-            dtr["Date"] = message.Date;
+            dtr["Date"] = Utils.GetOffsetTime(message.Date);
             dtr["Text"] = message.Text ?? "";
             dtr["Source"] = message.Source ?? "";
             dtr["Level"] = string.Intern(message.Level.ToString());
@@ -321,6 +291,7 @@ namespace Analogy
             }
             return dtr;
         }
+
         public static bool IsCompressedArchive(string filename)
         {
             return filename.EndsWith(".gz", StringComparison.InvariantCultureIgnoreCase) ||
@@ -353,6 +324,13 @@ namespace Analogy
                     throw new ArgumentOutOfRangeException();
             }
         }
+        public static void FillLogLevels(CheckedListBoxControl chkLstLogLevel)
+        {
+            chkLstLogLevel.Items.Clear();
+            chkLstLogLevel.CheckStyle = CheckStyles.Standard;
+            chkLstLogLevel.Items.AddRange(LogLevels.Select(l => new CheckedListBoxItem(l, UserSettingsManager.UserSettings.FilteringExclusion.IsLogLevelExcluded(l))).ToArray());
+
+        }
 
         public static void OpenLink(string url)
         {
@@ -375,6 +353,113 @@ namespace Analogy
             string location = System.Reflection.Assembly.GetExecutingAssembly().Location;
             var directory = System.IO.Path.GetDirectoryName(location);
             return directory;
+        }
+
+        public static string GetOpenFilter(string openFilter)
+        {
+            if (!UserSettingsManager.UserSettings.EnableCompressedArchives)
+            {
+                return openFilter;
+            }
+            //if (openFilter.Contains("*.gz") || openFilter.Contains("*.zip")) return openFilter;
+            //string compressedFilter = "|Compressed archives (*.gz, *.zip)|*.gz;*.zip";
+            //return openFilter + compressedFilter;
+            if (!openFilter.Contains("*.zip", StringComparison.InvariantCultureIgnoreCase))
+            {
+                string compressedFilter = "|Compressed Zip Archive (*.zip)|*.zip";
+                openFilter = openFilter + compressedFilter;
+            }
+            if (!openFilter.Contains("*.gz", StringComparison.InvariantCultureIgnoreCase))
+            {
+                string compressedFilter = "|Compressed Gzip Archive (*.gz)|*.gz";
+                openFilter = openFilter + compressedFilter;
+            }
+
+            return openFilter;
+        }
+
+        public static T? GetLogWindows<T>(Control mainControl) where T : class
+        {
+            while (true)
+            {
+                if (mainControl is T logWindow)
+                {
+                    return logWindow;
+                }
+
+                if (mainControl is SplitContainer split)
+                {
+                    var log1 = GetLogWindows<T>(split.Panel1);
+                    if (log1 != null)
+                    {
+                        return log1;
+                    }
+
+                    mainControl = split.Panel2;
+                    continue;
+                }
+
+                for (int i = 0; i < mainControl.Controls.Count; i++)
+                {
+                    var control = mainControl.Controls[i];
+                    if (control is T logWindow2)
+                    {
+                        return logWindow2;
+                    }
+
+                    if (GetLogWindows<T>(control) is T log)
+                    {
+                        return log;
+                    }
+                }
+
+                return null;
+            }
+        }
+
+        public static string ExtractJsonObject(string mixedString)
+        {
+            for (var i = mixedString.IndexOf('{'); i > -1; i = mixedString.IndexOf('{', i + 1))
+            {
+                for (var j = mixedString.LastIndexOf('}'); j > -1; j = mixedString.LastIndexOf("}", j - 1))
+                {
+                    var jsonProbe = mixedString.Substring(i, j - i + 1);
+                    try
+                    {
+                        var valid = JsonConvert.DeserializeObject(jsonProbe);
+                        return jsonProbe;
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
+
+            return string.Empty;
+        }
+
+        public static DateTime GetOffsetTime(DateTime time)
+        {
+            return UserSettingsManager.UserSettings.TimeOffsetType switch
+            {
+                TimeOffsetType.None => time,
+                TimeOffsetType.Predefined => time.Add(UserSettingsManager.UserSettings.TimeOffset),
+                TimeOffsetType.UtcToLocalTime => time.ToLocalTime(),
+                TimeOffsetType.LocalTimeToUtc => time.ToUniversalTime(),
+                _ => time
+            };
+        }
+
+        public static SuperToolTip GetSuperTip(string title, string content)
+        {
+            SuperToolTip toolTip = new SuperToolTip();
+            // Create an object to initialize the SuperToolTip.
+            SuperToolTipSetupArgs args = new SuperToolTipSetupArgs();
+            args.Title.Text = title;
+            args.Contents.Text = content;
+            // args.Contents.Image = realTime.ToolTip.Image;
+            toolTip.Setup(args);
+            return toolTip;
         }
     }
 

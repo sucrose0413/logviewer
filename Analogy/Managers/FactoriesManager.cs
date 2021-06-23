@@ -28,6 +28,7 @@ namespace Analogy
             Factories = new List<FactoryContainer>();
             BuiltInFactories = new List<FactoryContainer>();
             var analogyFactory = new AnalogyBuiltInFactory();
+            analogyFactory.RegisterNotificationCallback(NotificationManager.Instance);
             var currentAssembly = Assembly.GetExecutingAssembly();
             var analogyFactorySetting = UserSettingsManager.UserSettings.GetOrAddFactorySetting(analogyFactory);
             analogyFactorySetting.FactoryName = analogyFactory.Title;
@@ -183,7 +184,7 @@ namespace Analogy
         public FactoryContainer GetFactoryContainer(Guid componentId)
             => Factories.SingleOrDefault(f => f.ContainsDataProviderOrDataFactory(componentId));
 
-        public Image GetSmallImage(Guid componentId)
+        public Image? GetSmallImage(Guid componentId)
         {
             foreach (var factoryContainer in Factories.Where(f => f.ContainsDataProviderOrDataFactory(componentId)))
             {

@@ -9,6 +9,10 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using Analogy.Properties;
+using DevExpress.Utils.Menu;
+using DevExpress.XtraTreeList;
+using DevExpress.XtraTreeList.Localization;
 
 namespace Analogy
 {
@@ -47,7 +51,6 @@ namespace Analogy
             ucLogs1.CancellationTokenSource = cts;
         }
 
-        public void ShowFolderAndFilesPanel(bool on) => spltMain.Panel1Collapsed = !on;
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
             ucLogs1.ProcessCmdKeyFromParent(keyData);
@@ -126,7 +129,8 @@ namespace Analogy
 
             SelectedPath = folder;
             treeList1.SelectionChanged -= TreeList1_SelectionChanged;
-            bool recursiveLoad = checkEditRecursiveLoad.Checked;
+            bool isRoot = Directory.GetLogicalDrives().Any(d => d.Equals(SelectedPath, StringComparison.OrdinalIgnoreCase));
+            bool recursiveLoad = checkEditRecursiveLoad.Checked && !isRoot;
             DirectoryInfo dirInfo = new DirectoryInfo(folder);
             UserSettingsManager.UserSettings.AddToRecentFolders(DataProvider.Id, folder);
             List<FileInfo> fileInfos = DataProvider.GetSupportedFiles(dirInfo, recursiveLoad).Distinct(new FileInfoComparer()).ToList();
@@ -137,10 +141,13 @@ namespace Analogy
                 treeList1.Nodes.Add(fi.Name, fi.LastWriteTime, fi.Length, fi.FullName);
                 // TreeListFileNodes.Add(fi.FullName);
             }
-
-            treeList1.BestFitColumns();
             treeList1.ClearSelection();
-
+            //treeList1.TopVisibleNodeIndex = 0;
+            treeList1.BestFitColumns();
+            if (treeList1.Nodes.Any())
+            {
+                treeList1.MakeNodeVisible(treeList1.Nodes.FirstNode);
+            }
             treeList1.SelectionChanged += TreeList1_SelectionChanged;
         }
 
@@ -212,6 +219,37 @@ namespace Analogy
             await LoadFilesAsync(files, chkbSelectionMode.Checked);
         }
 
+        private async void treeList1_RowClick(object sender, DevExpress.XtraTreeList.RowClickEventArgs e)
+        {
+  
+        }
+
+        private void treeList1_PopupMenuShowing(object sender, DevExpress.XtraTreeList.PopupMenuShowingEventArgs e)
+        {
+            async void OpenFileInSeparateWindow(string filename)
+            {
+                ucLogs1.OnFocusedRowChanged -= UcLogs1_OnFocusedRowChanged;
+                await ucLogs1.LoadFileInSeparateWindow(filename);
+                ucLogs1.OnFocusedRowChanged += UcLogs1_OnFocusedRowChanged;
+            }
+
+            
+                TreeList treeList = sender as TreeList;
+                TreeListHitInfo hitInfo = treeList.CalcHitInfo(e.Point);
+
+                // removing the "Runtime columns customization" item of the column header menu
+                if (hitInfo.HitInfoType == HitInfoType.Cell)
+                {
+                    var file = hitInfo.Node.GetValue(colFullPath).ToString();
+
+                    DXMenuItem menuItem = new DXMenuItem($"Open file {Path.GetFileName(file)} in separate Window",
+                        (_, __) => { OpenFileInSeparateWindow(file); }) {Tag = hitInfo.Column};
+                   //menuItem.Image =Resources.
+                    e.Menu.Items.Add(menuItem);
+                }
+            
+
+        }
     }
 
 }

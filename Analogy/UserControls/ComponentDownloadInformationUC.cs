@@ -4,6 +4,7 @@ using DevExpress.XtraEditors;
 using System;
 using System.Drawing;
 using System.Windows.Forms;
+using Analogy.DataTypes;
 
 namespace Analogy.UserControls
 {
@@ -30,7 +31,7 @@ namespace Analogy.UserControls
                 if (DownloadInfo != null && DownloadInfo.IsUpdateAvailable && DownloadInfo.DownloadURL != null)
                 {
                     btnDownload.Enabled = false;
-                    await UpdateManager.Instance.InitiateUpdate(DownloadInfo.Name, DownloadInfo.DownloadURL);
+                    await UpdateManager.Instance.InitiateUpdate(DownloadInfo.Name, DownloadInfo.DownloadURL,false);
                     btnDownload.Enabled = true;
                 }
                 else
@@ -65,6 +66,10 @@ namespace Analogy.UserControls
             else
             {
                 lblTitle.Text = DownloadInfo?.Name;
+                if (DownloadInfo is MissingDownloadInformation mdi)
+                {
+                    picture.Image = mdi.Image;
+                }
             }
 
             lblCurrentVersion.Text = DownloadInfo?.InstalledVersion > new Version(0, 0, 0)
